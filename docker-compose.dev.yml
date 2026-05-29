@@ -1,0 +1,24 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: jobsdb-backend-dev
+    restart: unless-stopped
+    volumes:
+      - ./backend:/app
+      - ~/.m2:/root/.m2
+    command: mvn spring-boot:run
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: jobsdb-frontend-dev
+    restart: unless-stopped
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports: !override
+      - "${FRONTEND_PORT:-4200}:4200"
+    command: npx ng serve --host 0.0.0.0 --poll 2000
