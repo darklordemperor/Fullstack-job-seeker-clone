@@ -52,6 +52,14 @@ a {
     linear-gradient(90deg, #081f53, #0b2b6f);
 }
 
+.jobsdb-search-bar {
+  background-color: #08245c;
+  background-image:
+    radial-gradient(circle at 8% -5%, #e6007e 0 54px, transparent 56px),
+    radial-gradient(circle at 92% 65%, rgba(48, 95, 174, 0.42) 0 94px, transparent 96px),
+    radial-gradient(circle at 25% 120%, rgba(31, 75, 150, 0.52) 0 120px, transparent 122px);
+}
+
 .card-surface {
   border: 1px solid var(--color-line);
   border-radius: 8px;

@@ -29,12 +29,27 @@ export class AdminRepository {
 
   applications(): Observable<JobApplication[]> {
     return this.http.get<ApiResponse<JobApplication[]>>(`${this.apiUrl}/admin/applications`).pipe(
-      map((response) => response.data),
+      map((response) => response.data.length > 0 ? response.data : sampleApplications),
       catchError(() => of(sampleApplications)),
     );
   }
 
   banUser(id: string, reason: string): Observable<void> {
-    return this.http.post<ApiResponse<void>>(`${this.apiUrl}/admin/users/${id}/ban`, { reason }).pipe(map(() => undefined));
+    return this.http.post<ApiResponse<void>>(`${this.apiUrl}/admin/users/${id}/ban`, { reason }).pipe(
+      map(() => undefined),
+    );
+  }
+
+  unbanUser(id: string): Observable<void> {
+    return this.http.delete<ApiResponse<void>>(`${this.apiUrl}/admin/users/${id}/ban`).pipe(
+      map(() => undefined),
+    );
+  }
+
+  deleteApplication(id: string, reason: string): Observable<void> {
+    return this.http.delete<ApiResponse<void>>(`${this.apiUrl}/admin/applications/${id}`, { body: { reason } }).pipe(
+      map(() => undefined),
+      catchError(() => of(undefined)),
+    );
   }
 }

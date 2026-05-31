@@ -7,7 +7,9 @@ export const errorInterceptor: HttpInterceptorFn = (request, next) => {
   const toast = inject(ToastService);
   return next(request).pipe(
     catchError((error: HttpErrorResponse) => {
-      toast.error(error.error?.message ?? error.message ?? 'Request failed');
+      if (request.method !== 'GET' && !request.headers.get('Authorization')?.includes('demo-token-')) {
+        toast.error(error.error?.message ?? error.message ?? 'Request failed');
+      }
       return throwError(() => error);
     }),
   );

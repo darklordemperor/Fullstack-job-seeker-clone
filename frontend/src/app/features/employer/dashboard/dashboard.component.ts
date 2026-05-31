@@ -14,7 +14,11 @@ import { EmployerRepository } from '../../../data/employer.repository';
           <h1 class="text-2xl font-bold">Employer dashboard</h1>
           <p class="mt-2 text-sm text-slate-600">Manage job posts and review incoming applicants.</p>
         </div>
-        <a routerLink="/employer/post-job" class="rounded-md bg-pink-600 px-5 py-3 text-sm font-bold text-white">Post job</a>
+        <div class="flex gap-3">
+          <a routerLink="/jobs" class="rounded-md border border-slate-300 px-5 py-3 text-sm font-bold">Browse jobs</a>
+          <a routerLink="/employer/manage-jobs" class="rounded-md border border-slate-300 px-5 py-3 text-sm font-bold">Manage jobs</a>
+          <a routerLink="/employer/post-job" class="rounded-md bg-pink-600 px-5 py-3 text-sm font-bold text-white">Post job</a>
+        </div>
       </div>
       <section class="mt-7 grid gap-4 md:grid-cols-3">
         @for (metric of metrics; track metric.label) {

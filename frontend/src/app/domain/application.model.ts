@@ -8,4 +8,6 @@ export interface JobApplication {
   appliedAt: string;
   jobTitle?: string;
   companyName?: string;
+  applicantName?: string;
+  applicantEmail?: string;
 }

@@ -9,7 +9,7 @@ import { ModalComponent } from '../../../../shared/ui/modal/modal.component';
   template: `
     <app-modal [open]="open()" title="Ban user" (closed)="closed.emit()">
       <textarea class="min-h-28 w-full rounded border border-slate-300 p-3" placeholder="Reason" [ngModel]="reason()" (ngModelChange)="reason.set($event)"></textarea>
-      <button type="button" class="mt-4 rounded bg-pink-600 px-5 py-3 text-sm font-bold text-white" (click)="confirmed.emit(reason())">Ban user</button>
+      <button type="button" class="mt-4 rounded bg-pink-600 px-5 py-3 text-sm font-bold text-white" [disabled]="!reason().trim()" (click)="confirmed.emit(reason())">Ban user</button>
     </app-modal>
   `,
 })

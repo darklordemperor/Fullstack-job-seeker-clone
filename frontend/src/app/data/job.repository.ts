@@ -14,13 +14,18 @@ export class JobRepository {
   fetch(filters: JobFilter): Observable<PagedResponse<Job>> {
     let params = new HttpParams()
       .set('page', filters.page ?? 0)
-      .set('size', filters.size ?? 20);
+      .set('size', filters.size ?? 8);
     if (filters.q) {
       params = params.set('q', filters.q);
     }
+    if (filters.location) {
+      params = params.set('location', filters.location);
+    }
     return this.http.get<ApiResponse<PagedResponse<Job>>>(`${this.apiUrl}/jobs`, { params }).pipe(
-      map((response) => response.data),
-      catchError(() => of({ content: sampleJobs, totalElements: sampleJobs.length, totalPages: 1, page: filters.page ?? 0 })),
+      map((response) => response.data.content.length > 0 || response.data.totalElements > 0
+        ? { ...response.data, content: response.data.content.map((job) => this.decorate(job)) }
+        : this.page(sampleJobs, filters)),
+      catchError(() => of(this.page(sampleJobs, filters))),
     );
   }
 
@@ -29,5 +34,25 @@ export class JobRepository {
       map((response) => response.data),
       catchError(() => of(sampleJobs.find((job) => job.id === id) ?? sampleJobs[0])),
     );
+  }
+
+  private page(jobs: Job[], filters: JobFilter): PagedResponse<Job> {
+    const query = filters.q?.trim().toLowerCase();
+    const location = filters.location?.trim().toLowerCase();
+    const content = jobs.filter((job) => {
+      const searchable = [job.title, job.companyName, job.description, job.industry].filter(Boolean).join(' ').toLowerCase();
+      return (!query || searchable.includes(query))
+        && (!location || job.location?.toLowerCase().includes(location));
+    });
+    const page = filters.page ?? 0;
+    return { content: content.slice(page * 8, page * 8 + 8), totalElements: content.length, totalPages: Math.max(1, Math.ceil(content.length / 8)), page };
+  }
+
+  private decorate(job: Job): Job {
+    return {
+      ...job,
+      companyName: job.companyName ?? 'JobsDB Partner Company',
+      industry: job.industry ?? 'General business',
+    };
   }
 }

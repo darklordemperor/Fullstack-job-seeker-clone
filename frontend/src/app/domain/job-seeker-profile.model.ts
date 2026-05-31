@@ -26,15 +26,27 @@ export interface Language {
   proficiency?: string | null;
 }
 
+export interface License {
+  name: string;
+  issuer?: string | null;
+  issuedYear?: number | null;
+  expiresYear?: number | null;
+  description?: string | null;
+}
+
 export interface JobSeekerProfile {
   fullName: string;
   phone?: string | null;
   dateOfBirth?: string | null;
   nationality?: string | null;
+  location?: string | null;
+  summary?: string | null;
+  profileImageUrl?: string | null;
   expectedSalary: SalaryRange;
   skills: Skill[];
   workExperiences: WorkExperience[];
   educations: Education[];
   languages: Language[];
+  licenses: License[];
   resumeUrl?: string | null;
 }

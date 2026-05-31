@@ -15,11 +15,19 @@ public class JobQueryUseCase {
 		this.jobs = jobs;
 	}
 
-	public List<Job> publicJobs(int page, int size, String query) {
-		return jobs.findAllPublic(page, size, query);
+	public List<Job> publicJobs(int page, int size, String query, String location) {
+		return jobs.findAllPublic(page, size, normalize(query), normalize(location));
+	}
+
+	public long countPublicJobs(String query, String location) {
+		return jobs.countPublic(normalize(query), normalize(location));
 	}
 
 	public Job find(UUID id) {
 		return jobs.findById(id).orElseThrow(() -> new ResourceNotFoundException("Job not found"));
+	}
+
+	private String normalize(String value) {
+		return value == null || value.isBlank() ? "" : value.trim();
 	}
 }

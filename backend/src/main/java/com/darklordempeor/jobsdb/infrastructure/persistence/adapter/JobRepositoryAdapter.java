@@ -31,8 +31,13 @@ public class JobRepositoryAdapter implements JobRepository {
 	}
 
 	@Override
-	public List<Job> findAllPublic(int page, int size, String query) {
-		return jobs.findPublicJobs(query, PageRequest.of(page, size)).stream().map(this::toDomain).toList();
+	public List<Job> findAllPublic(int page, int size, String query, String location) {
+		return jobs.findPublicJobs(query, location, PageRequest.of(page, size)).stream().map(this::toDomain).toList();
+	}
+
+	@Override
+	public long countPublic(String query, String location) {
+		return jobs.countPublicJobs(query, location);
 	}
 
 	@Override

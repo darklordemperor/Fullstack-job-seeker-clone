@@ -26,10 +26,15 @@ public class JobsController {
 	@GetMapping
 	public ApiResponse<PagedResponse<JobResponse>> list(
 			@RequestParam(defaultValue = "0") int page,
-			@RequestParam(defaultValue = "20") int size,
-			@RequestParam(required = false) String q) {
-		var content = jobs.publicJobs(page, size, q).stream().map(mapper::toResponse).toList();
-		return ApiResponse.success(new PagedResponse<>(content, content.size(), 1, page), "Jobs loaded");
+			@RequestParam(defaultValue = "8") int size,
+			@RequestParam(required = false) String q,
+			@RequestParam(required = false) String location) {
+		int safePage = Math.max(0, page);
+		int pageSize = Math.min(Math.max(1, size), 8);
+		long totalElements = jobs.countPublicJobs(q, location);
+		int totalPages = Math.max(1, (int) Math.ceil((double) totalElements / pageSize));
+		var content = jobs.publicJobs(safePage, pageSize, q, location).stream().map(mapper::toResponse).toList();
+		return ApiResponse.success(new PagedResponse<>(content, totalElements, totalPages, safePage), "Jobs loaded");
 	}
 
 	@GetMapping("/{id}")

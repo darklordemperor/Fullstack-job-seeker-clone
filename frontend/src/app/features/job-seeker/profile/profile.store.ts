@@ -21,7 +21,7 @@ export const ProfileStore = signalStore(
       if (!current) {
         return 0;
       }
-      const checks = [current.fullName, current.phone, current.resumeUrl, current.skills.length, current.workExperiences.length, current.educations.length];
+      const checks = [current.fullName, current.phone, current.summary, current.resumeUrl, current.skills.length, current.workExperiences.length, current.educations.length];
       return Math.round((checks.filter(Boolean).length / checks.length) * 100);
     }),
   })),
@@ -48,6 +48,25 @@ export const ProfileStore = signalStore(
               next: (updated) => {
                 patchState(store, { profile: updated, loading: false });
                 toast.success('Profile updated');
+              },
+              error: (err: Error) => {
+                patchState(store, { error: err.message, loading: false });
+                toast.error(err.message);
+              },
+            }),
+          ),
+        ),
+      ),
+    ),
+    uploadImage: rxMethod<File>(
+      pipe(
+        tap(() => patchState(store, { loading: true })),
+        switchMap((file) =>
+          repo.uploadProfileImage(file).pipe(
+            tapResponse({
+              next: (profile) => {
+                patchState(store, { profile, loading: false, error: null });
+                toast.success('Profile image updated');
               },
               error: (err: Error) => {
                 patchState(store, { error: err.message, loading: false });

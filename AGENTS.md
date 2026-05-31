@@ -4,9 +4,9 @@ This repository is a full-stack JobsDB clone monorepo. Keep the root clean and p
 
 ## Root Layout
 
-- `backend/` - Spring Boot API.
+- `backend/` - Spring Boot REST API.
 - `frontend/` - Angular web app.
-- `contracts/` - shared API contracts, request/response examples, and future generated clients.
+- `contracts/` - shared API contract notes, request/response examples, and future generated clients.
 - `docker-compose.yml` - production-like local stack.
 - `docker-compose.dev.yml` - hot-reload development overrides.
 - `.env.example` - safe template for local environment variables.
@@ -22,10 +22,11 @@ Stack:
 - Java 21
 - Maven wrapper, not Gradle
 - Spring Boot 4.0.6
-- Spring Security 7 with stateless JWT
-- Spring Data JPA, Hibernate, PostgreSQL
-- Flyway owns schema migrations
-- MapStruct, Lombok, SpringDoc OpenAPI
+- Spring Security 7 with stateless JWT and refresh tokens
+- Spring Data JPA, Hibernate, PostgreSQL 17
+- Flyway-owned schema migrations
+- MapStruct, Lombok, validation, SpringDoc OpenAPI
+- Local profile-image storage exposed from `/uploads/**`
 
 Architecture package root:
 
@@ -35,32 +36,39 @@ com.darklordempeor.jobsdb
 
 Follow the existing Clean Architecture split:
 
-- `domain/` - pure domain models, repository ports, business services, exceptions. No Spring annotations here.
+- `domain/` - pure domain models, repository ports, business services, and exceptions. Do not add Spring annotations here.
 - `application/` - use cases and application ports.
-- `infrastructure/` - JPA entities/repositories/adapters, security, email.
-- `interfaces/` - REST controllers, DTOs, MapStruct mappers, exception advice.
+- `infrastructure/` - persistence entities, JPA repositories, adapters, security, email, and storage.
+- `interfaces/` - REST controllers, DTOs, MapStruct mappers, and exception advice.
 
 Important backend rules:
 
 - Use `application.yml`, not `.properties`.
 - Keep JPA entities separate from domain models.
 - Keep controllers thin; orchestration belongs in use cases.
-- All API responses use `ApiResponse<T>`.
-- Flyway migrations live in `backend/src/main/resources/db/migration/`.
-- `spring.jpa.hibernate.ddl-auto=validate`; do not let Hibernate create schema.
+- Wrap API responses in `ApiResponse<T>`.
+- Add schema changes through Flyway migrations in `backend/src/main/resources/db/migration/`.
+- Keep `spring.jpa.hibernate.ddl-auto=validate`; do not let Hibernate create schema.
 - Admin users are seeded by Flyway only. Do not add a public admin registration endpoint.
+- Preserve stateless security and role boundaries: `ROLE_JOB_SEEKER`, `ROLE_EMPLOYER`, and `ROLE_ADMIN`.
+- Keep profile-image validation in the storage boundary. Current uploads accept JPG or PNG up to 5 MB and produce `256 x 256` PNG avatars.
 
-Seeded admin login:
+Current backend caveat:
+
+- `GET /api/employer/jobs/{id}/applicants` returns an empty placeholder list. Treat it as unfinished behavior when extending the employer flow.
+
+Seeded local data:
 
 ```text
-email: admin@jobsdb.local
-password: password
+admin email: admin@jobsdb.local
+admin password: password
+sample jobs: 20 active records owned by a seeded employer
 ```
 
 Useful commands:
 
 ```powershell
-cd C:\projects\JobSDB-clone\backend
+cd C:\projects\Fullstack-job-seeker-clone\backend
 .\mvnw.cmd test
 .\mvnw.cmd spring-boot:run
 ```
@@ -73,54 +81,59 @@ Stack:
 
 - Angular 21
 - Standalone components only
-- NgRx SignalStore, not classic actions/reducers
+- Angular Router lazy feature routes
+- NgRx SignalStore, not classic actions and reducers
 - Tailwind CSS 4
 - Strict TypeScript
-- Angular Router lazy feature routes
 - Functional HTTP interceptors
+- Nginx production routing for `/api` and `/uploads`
+
+Feature areas:
+
+- `features/auth/` - login and job-seeker or employer registration.
+- `features/jobs/` - public paginated job list, filters, and job detail.
+- `features/job-seeker/` - profile editor, avatar upload, applications, and settings.
+- `features/employer/` - dashboard, post job, manage jobs, applicants, and company settings.
+- `features/admin/` - dashboard, users and bans, application moderation.
 
 Angular rules:
 
 - Use `standalone: true` components.
 - Use `@if`, `@for`, and `@switch`; do not use `*ngIf` or `*ngFor`.
 - Use `input<T>()` and `output<T>()`; do not use `@Input`, `@Output`, or `EventEmitter`.
-- Use `inject()` for DI; avoid constructor injection.
-- Do not call `subscribe()` inside components. Prefer SignalStore methods, `toSignal()`, or async pipe.
+- Use `inject()` for dependency injection; avoid constructor injection.
+- Do not call `subscribe()` inside components. Prefer SignalStore methods, `toSignal()`, async pipe, or `firstValueFrom()` for event-driven operations.
 - Keep API calls in `frontend/src/app/data/` repositories.
-- Keep TypeScript interfaces only in `frontend/src/app/domain/`.
+- Keep TypeScript interfaces in `frontend/src/app/domain/`.
+- Add authenticated route groups through the existing `roleGuard(...)`.
+
+Current frontend caveat:
+
+- `features/job-seeker/settings/` currently updates local UI state only. It does not persist settings to the backend.
 
 Useful commands:
 
 ```powershell
-cd C:\projects\JobSDB-clone\frontend
+cd C:\projects\Fullstack-job-seeker-clone\frontend
 npm.cmd install
 npm.cmd start
 npm.cmd run build
 npm.cmd test -- --watch=false
 ```
 
-Local Angular dev server:
-
-```text
-http://localhost:4200
-```
-
-The frontend proxies `/api` to:
-
-```text
-http://localhost:8080
-```
+The Angular dev server runs at `http://localhost:4200` and proxies `/api` and `/uploads` to `http://localhost:8080`.
 
 ## Database And Docker
 
-The project expects PostgreSQL. Docker Compose provides:
+Docker Compose provides:
 
 - `postgres:17`
 - pgAdmin on `http://localhost:5050`
 - backend on `http://localhost:8080`
 - frontend on `http://localhost:4200`
+- named volumes for PostgreSQL, pgAdmin, and uploaded images
 
-Root `.env` variables use:
+Root `.env` variables:
 
 ```text
 DB_NAME
@@ -130,52 +143,55 @@ DB_PORT
 JWT_SECRET
 PGADMIN_EMAIL
 PGADMIN_PASS
+PGADMIN_PORT
+BACKEND_PORT
+FRONTEND_PORT
 ```
 
-Start only Postgres and pgAdmin:
+Start only PostgreSQL and pgAdmin:
 
 ```powershell
-cd C:\projects\JobSDB-clone
+cd C:\projects\Fullstack-job-seeker-clone
 docker compose up -d postgres pgadmin
 ```
 
 Start the full stack:
 
 ```powershell
-cd C:\projects\JobSDB-clone
+cd C:\projects\Fullstack-job-seeker-clone
 docker compose up --build
 ```
 
-Development override:
+Start the hot-reload development stack:
 
 ```powershell
-cd C:\projects\JobSDB-clone
+cd C:\projects\Fullstack-job-seeker-clone
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-If Windows PostgreSQL is already using host port `5432`, either stop that service or change `DB_PORT` to another host port such as `5433`. Only one service can bind the same host port at a time.
+If Windows PostgreSQL is already using host port `5432`, either stop that service or change `DB_PORT` to another host port such as `5433`.
 
-Docker pgAdmin connection for the Compose network:
+Docker pgAdmin connection:
 
 ```text
 host: postgres
 port: 5432
 database: jobsdb
-username: jobsdb
-password: jobsdb_dev_password
+username: value of DB_USER
+password: value of DB_PASS
 ```
 
-Desktop pgAdmin connection from Windows, when Docker owns the host port:
+Desktop pgAdmin connection, when Docker owns the host port:
 
 ```text
 host: 127.0.0.1
-port: 5432
+port: value of DB_PORT, default 5432
 database: jobsdb
-username: jobsdb
-password: jobsdb_dev_password
+username: value of DB_USER
+password: value of DB_PASS
 ```
 
-Do not run `docker compose down -v` unless the user explicitly accepts deleting the local Postgres volume.
+Do not run `docker compose down -v` unless the user explicitly accepts deleting local PostgreSQL, pgAdmin, and uploaded-image volumes.
 
 ## Git Notes
 
@@ -193,22 +209,29 @@ Before committing:
 git status --short --branch
 ```
 
-Avoid committing `.env`, `node_modules/`, `target/`, or `dist/`.
+Avoid committing `.env`, `node_modules/`, `target/`, `dist/`, or uploaded runtime files.
 
 ## Verification
 
-For backend changes, prefer:
+For backend changes:
 
 ```powershell
 cd backend
 .\mvnw.cmd test
 ```
 
-For frontend changes, prefer:
+For frontend changes:
 
 ```powershell
 cd frontend
 npm.cmd run build
 ```
 
-Use narrower tests when the change is small, but always report what was and was not verified.
+For Docker Compose changes:
+
+```powershell
+docker compose config
+docker compose -f docker-compose.yml -f docker-compose.dev.yml config
+```
+
+Use narrower checks when a change is small, but always report what was and was not verified.

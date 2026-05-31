@@ -18,8 +18,21 @@ public interface JpaJobRepository extends JpaRepository<JobEntity, UUID> {
 	@Query("""
 			select j from JobEntity j
 			where j.status = 'ACTIVE'
-			and (:query is null or lower(j.title) like lower(concat('%', :query, '%')))
+			and (:query = ''
+				or lower(j.title) like lower(concat('%', :query, '%'))
+				or lower(j.description) like lower(concat('%', :query, '%')))
+			and (:location = '' or lower(j.location) like lower(concat('%', :location, '%')))
 			order by j.createdAt desc
 			""")
-	List<JobEntity> findPublicJobs(@Param("query") String query, Pageable pageable);
+	List<JobEntity> findPublicJobs(@Param("query") String query, @Param("location") String location, Pageable pageable);
+
+	@Query("""
+			select count(j) from JobEntity j
+			where j.status = 'ACTIVE'
+			and (:query = ''
+				or lower(j.title) like lower(concat('%', :query, '%'))
+				or lower(j.description) like lower(concat('%', :query, '%')))
+			and (:location = '' or lower(j.location) like lower(concat('%', :location, '%')))
+			""")
+	long countPublicJobs(@Param("query") String query, @Param("location") String location);
 }

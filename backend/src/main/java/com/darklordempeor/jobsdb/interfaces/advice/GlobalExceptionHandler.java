@@ -4,6 +4,7 @@ import com.darklordempeor.jobsdb.domain.exception.DomainException;
 import com.darklordempeor.jobsdb.domain.exception.ResourceNotFoundException;
 import com.darklordempeor.jobsdb.interfaces.dto.response.ApiResponse;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -21,5 +22,11 @@ public class GlobalExceptionHandler {
 	@ResponseStatus(HttpStatus.BAD_REQUEST)
 	public ApiResponse<Void> badRequest(Exception ex) {
 		return ApiResponse.failure(ex.getMessage());
+	}
+
+	@ExceptionHandler(MaxUploadSizeExceededException.class)
+	@ResponseStatus(HttpStatus.PAYLOAD_TOO_LARGE)
+	public ApiResponse<Void> imageTooLarge() {
+		return ApiResponse.failure("Profile image must be 5 MB or smaller");
 	}
 }

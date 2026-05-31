@@ -29,7 +29,19 @@ export class EmployerRepository {
   createJob(job: Partial<Job>): Observable<Job> {
     return this.http.post<ApiResponse<Job>>(`${this.apiUrl}/jobs`, job).pipe(
       map((response) => response.data),
-      catchError(() => of({ ...sampleJobs[0], ...job, id: crypto.randomUUID() } as Job)),
+    );
+  }
+
+  updateJobStatus(id: string, status: Job['status']): Observable<Job> {
+    return this.http.patch<ApiResponse<Job>>(`${this.apiUrl}/jobs/${id}/status`, { status }).pipe(
+      map((response) => response.data),
+    );
+  }
+
+  updateProfile(profile: EmployerProfile): Observable<EmployerProfile> {
+    return this.http.put<ApiResponse<EmployerProfile>>(`${this.apiUrl}/employer/profile`, profile).pipe(
+      map((response) => response.data),
+      catchError(() => of(profile)),
     );
   }
 }

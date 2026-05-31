@@ -10,6 +10,10 @@ export const jobSeekerRoutes: Routes = [
     loadComponent: () => import('./my-applications/my-applications.component').then((m) => m.MyApplicationsComponent),
   },
   {
+    path: 'settings',
+    loadComponent: () => import('./settings/settings.component').then((m) => m.JobSeekerSettingsComponent),
+  },
+  {
     path: '',
     redirectTo: 'profile',
     pathMatch: 'full',

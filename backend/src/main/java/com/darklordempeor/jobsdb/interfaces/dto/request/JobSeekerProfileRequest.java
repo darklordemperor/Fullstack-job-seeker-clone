@@ -8,6 +8,8 @@ public record JobSeekerProfileRequest(
 		String phone,
 		LocalDate dateOfBirth,
 		String nationality,
+		String location,
+		String summary,
 		Integer expectedSalaryMin,
 		Integer expectedSalaryMax,
 		String salaryCurrency,
@@ -15,5 +17,6 @@ public record JobSeekerProfileRequest(
 		List<WorkExperienceRequest> workExperiences,
 		List<EducationRequest> educations,
 		List<LanguageRequest> languages,
+		List<LicenseRequest> licenses,
 		String resumeUrl) {
 }

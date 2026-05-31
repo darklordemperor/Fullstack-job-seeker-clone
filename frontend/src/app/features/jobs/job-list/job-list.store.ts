@@ -12,6 +12,7 @@ interface JobListState {
   page: number;
   totalElements: number;
   totalPages: number;
+  filters: JobFilter;
   loading: boolean;
   error: string | null;
 }
@@ -22,6 +23,7 @@ const initialState: JobListState = {
   page: 0,
   totalElements: 0,
   totalPages: 1,
+  filters: { page: 0, size: 8 },
   loading: false,
   error: null,
 };
@@ -31,10 +33,10 @@ export const JobListStore = signalStore(
   withComputed(({ jobs }) => ({
     hasJobs: computed(() => jobs().length > 0),
   })),
-  withMethods((store, repo = inject(JobRepository)) => ({
-    loadData: rxMethod<JobFilter>(
+  withMethods((store, repo = inject(JobRepository)) => {
+    const loadData = rxMethod<JobFilter>(
       pipe(
-        tap(() => patchState(store, { loading: true, error: null })),
+        tap((filters) => patchState(store, { loading: true, error: null, filters })),
         switchMap((params) =>
           repo.fetch(params).pipe(
             tapResponse({
@@ -51,9 +53,16 @@ export const JobListStore = signalStore(
           ),
         ),
       ),
-    ),
-    select(job: Job): void {
-      patchState(store, { selected: job });
-    },
-  })),
+    );
+    return {
+      loadData,
+      select(job: Job): void {
+        patchState(store, { selected: job });
+      },
+      loadPage(page: number): void {
+        const filters = store.filters();
+        loadData({ ...filters, page, size: 8 });
+      },
+    };
+  }),
 );

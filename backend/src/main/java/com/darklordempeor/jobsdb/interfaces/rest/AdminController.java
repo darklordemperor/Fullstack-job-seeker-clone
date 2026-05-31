@@ -12,6 +12,7 @@ import com.darklordempeor.jobsdb.interfaces.dto.response.UserResponse;
 import com.darklordempeor.jobsdb.interfaces.mapper.ApplicationMapper;
 import com.darklordempeor.jobsdb.interfaces.mapper.UserMapper;
 import jakarta.validation.Valid;
+import java.security.Principal;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -52,8 +53,8 @@ public class AdminController {
 	}
 
 	@PostMapping("/users/{id}/ban")
-	public ApiResponse<Void> ban(@PathVariable UUID id, @Valid @RequestBody BanUserRequest request) {
-		admin.banUser(id, request.reason());
+	public ApiResponse<Void> ban(Principal principal, @PathVariable UUID id, @Valid @RequestBody BanUserRequest request) {
+		admin.banUser(UUID.fromString(principal.getName()), id, request.reason());
 		return ApiResponse.success(null, "User banned");
 	}
 

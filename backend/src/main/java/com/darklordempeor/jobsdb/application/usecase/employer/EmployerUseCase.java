@@ -2,6 +2,8 @@ package com.darklordempeor.jobsdb.application.usecase.employer;
 
 import com.darklordempeor.jobsdb.domain.model.Job;
 import com.darklordempeor.jobsdb.domain.model.JobStatus;
+import com.darklordempeor.jobsdb.domain.exception.DomainException;
+import com.darklordempeor.jobsdb.domain.exception.ResourceNotFoundException;
 import com.darklordempeor.jobsdb.domain.repository.JobRepository;
 import com.darklordempeor.jobsdb.interfaces.dto.request.EmployerProfileRequest;
 import com.darklordempeor.jobsdb.interfaces.dto.request.JobRequest;
@@ -33,17 +35,26 @@ public class EmployerUseCase {
 	}
 
 	public Job updateJob(UUID employerId, UUID jobId, JobRequest request) {
+		Job existing = ownedJob(employerId, jobId);
 		return jobs.save(new Job(jobId, employerId, request.title(), request.description(), request.location(),
-				request.salaryMin(), request.salaryMax(), request.salaryCurrency(), JobStatus.DRAFT, Instant.now()));
+				request.salaryMin(), request.salaryMax(), request.salaryCurrency(), existing.status(), existing.createdAt()));
 	}
 
 	public Job updateStatus(UUID employerId, UUID jobId, JobStatus status) {
-		Job existing = jobs.findById(jobId).orElse(new Job(jobId, employerId, "", "", null, null, null, null, status, Instant.now()));
+		Job existing = ownedJob(employerId, jobId);
 		return jobs.save(new Job(existing.id(), existing.employerId(), existing.title(), existing.description(), existing.location(),
 				existing.salaryMin(), existing.salaryMax(), existing.salaryCurrency(), status, existing.createdAt()));
 	}
 
 	public List<Job> employerJobs(UUID employerId) {
 		return jobs.findByEmployerId(employerId);
+	}
+
+	private Job ownedJob(UUID employerId, UUID jobId) {
+		Job job = jobs.findById(jobId).orElseThrow(() -> new ResourceNotFoundException("Job not found"));
+		if (!job.employerId().equals(employerId)) {
+			throw new DomainException("Employers can only manage their own jobs");
+		}
+		return job;
 	}
 }
