@@ -123,6 +123,18 @@ npm.cmd test -- --watch=false
 
 The Angular dev server runs at `http://localhost:4200` and proxies `/api` and `/uploads` to `http://localhost:8080`.
 
+### Nginx Routing
+
+The production frontend container uses `frontend/nginx.conf` to serve the Angular build and reverse proxy backend-owned paths:
+
+- `/api/**` proxies to `http://backend:8080/api/**`.
+- `/uploads/**` proxies to `http://backend:8080/uploads/**`.
+- Angular client routes fall back to `index.html`.
+- Static assets use long-lived cache headers.
+- `client_max_body_size 7m` matches the Spring multipart request limit. The storage adapter separately enforces the 5 MB profile-image limit.
+
+When adding a new browser-facing backend path outside `/api`, update both `frontend/nginx.conf` for Docker and `frontend/proxy.conf.json` for local Angular development. Keep application authorization in Spring Security; Nginx is only the routing boundary.
+
 ## Database And Docker
 
 Docker Compose provides:

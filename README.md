@@ -164,6 +164,21 @@ Docker Compose persists PostgreSQL data, pgAdmin data, and uploaded profile imag
 
 If port `5432` is already in use, change `DB_PORT` in `.env`, for example to `5433`.
 
+## Nginx Routing
+
+The production frontend image builds Angular and serves the generated files through Nginx. Its configuration lives in `frontend/nginx.conf`.
+
+| Request | Nginx behavior |
+| --- | --- |
+| `/api/**` | Proxies to the Spring Boot container at `http://backend:8080/api/**` |
+| `/uploads/**` | Proxies uploaded profile images to `http://backend:8080/uploads/**` |
+| Static assets such as `.js`, `.css`, and images | Serves files directly with a 30-day immutable cache header |
+| Angular routes such as `/jobs/{id}` or `/employer/dashboard` | Falls back to `index.html` so Angular Router can handle the route |
+
+Nginx also enables gzip compression and accepts request bodies up to `7m`. This matches the backend multipart request limit while the profile-image storage adapter applies the stricter 5 MB image limit.
+
+During local `npm.cmd start` development, Nginx is not used. Angular uses `frontend/proxy.conf.json` to forward `/api` and `/uploads` to `http://localhost:8080`.
+
 ## Verification
 
 Backend tests:
