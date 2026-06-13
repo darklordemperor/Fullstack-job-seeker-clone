@@ -10,6 +10,7 @@ This repository is a full-stack JobsDB clone monorepo. Keep the root clean and p
 - `docker-compose.yml` - production-like local stack.
 - `docker-compose.dev.yml` - hot-reload development overrides.
 - `.env.example` - safe template for local environment variables.
+- `README.md` - viewer-facing project guide.
 
 Do not add framework source, package manifests, generated build output, or app config at the root unless it is truly shared orchestration or documentation.
 
@@ -52,6 +53,7 @@ Important backend rules:
 - Admin users are seeded by Flyway only. Do not add a public admin registration endpoint.
 - Preserve stateless security and role boundaries: `ROLE_JOB_SEEKER`, `ROLE_EMPLOYER`, and `ROLE_ADMIN`.
 - Keep profile-image validation in the storage boundary. Current uploads accept JPG or PNG up to 5 MB and produce `256 x 256` PNG avatars.
+- Keep browser-facing backend paths under `/api` or `/uploads` unless routing config is updated in both Docker and local frontend development.
 
 Current backend caveat:
 
@@ -88,8 +90,17 @@ Stack:
 - Functional HTTP interceptors
 - Nginx production routing for `/api` and `/uploads`
 
+Main app layout:
+
+- `core/` - auth, guards, HTTP interceptors, i18n, and shell layout.
+- `data/` - API repositories.
+- `domain/` - TypeScript interfaces and API models.
+- `features/` - lazy routed feature areas.
+- `shared/` - reusable UI components and pipes.
+
 Feature areas:
 
+- `features/home/` - public entry page.
 - `features/auth/` - login and job-seeker or employer registration.
 - `features/jobs/` - public paginated job list, filters, and job detail.
 - `features/job-seeker/` - profile editor, avatar upload, applications, and settings.
@@ -222,6 +233,12 @@ git status --short --branch
 ```
 
 Avoid committing `.env`, `node_modules/`, `target/`, `dist/`, or uploaded runtime files.
+
+## Documentation Notes
+
+Keep `README.md` viewer-facing and practical. If backend or frontend structure changes, update its schematic sections as part of the same change.
+
+Keep this `AGENTS.md` focused on contributor and coding-agent constraints. Avoid duplicating long user-facing explanations from the README unless they affect implementation choices.
 
 ## Verification
 
