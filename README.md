@@ -68,6 +68,54 @@ backend/src/main/resources/
     `-- V4__profile_fields_certifications_and_seed_jobs.sql
 ```
 
+Backend layer schematic:
+
+```mermaid
+flowchart TB
+    subgraph Interfaces["interfaces"]
+        Rest["REST controllers"]
+        Dto["request/response DTOs"]
+        Mapper["MapStruct mappers"]
+        Advice["exception advice"]
+    end
+
+    subgraph Application["application"]
+        UseCases["use cases"]
+        AppPorts["application ports"]
+    end
+
+    subgraph Domain["domain"]
+        Models["domain models"]
+        DomainServices["domain services"]
+        RepoPorts["repository ports"]
+        Exceptions["domain exceptions"]
+    end
+
+    subgraph Infrastructure["infrastructure"]
+        Entities["JPA entities"]
+        JpaRepos["Spring Data repositories"]
+        Adapters["persistence adapters"]
+        Security["JWT and security"]
+        Storage["profile-image storage"]
+        Email["email adapter"]
+    end
+
+    Rest --> UseCases
+    Dto --> Rest
+    Rest --> Mapper
+    Advice --> Rest
+    UseCases --> DomainServices
+    UseCases --> AppPorts
+    UseCases --> RepoPorts
+    DomainServices --> Models
+    RepoPorts --> Adapters
+    AppPorts --> Security
+    AppPorts --> Storage
+    AppPorts --> Email
+    Adapters --> JpaRepos
+    JpaRepos --> Entities
+```
+
 Backend request flow:
 
 ```mermaid
