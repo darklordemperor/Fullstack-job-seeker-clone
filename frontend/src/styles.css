@@ -1,0 +1,68 @@
+@import 'tailwindcss';
+
+:root {
+  --color-primary: #1c3f6e;
+  --color-primary-dark: #09245a;
+  --color-accent: #ff6b35;
+  --color-jobsdb-pink: #e6007e;
+  --color-ink: #10213d;
+  --color-muted: #667085;
+  --color-line: #d9e2ef;
+  --color-soft: #f5f8fc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color: var(--color-ink);
+  background: #ffffff;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.shell {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+}
+
+.jobsdb-pattern {
+  background:
+    radial-gradient(circle at 7% 12%, #e6007e 0 72px, transparent 74px),
+    radial-gradient(circle at 95% 48%, rgba(48, 95, 174, 0.35) 0 86px, transparent 88px),
+    radial-gradient(circle at 22% 100%, rgba(31, 75, 150, 0.45) 0 140px, transparent 142px),
+    linear-gradient(90deg, #081f53, #0b2b6f);
+}
+
+.jobsdb-search-bar {
+  background-color: #08245c;
+  background-image:
+    radial-gradient(circle at 8% -5%, #e6007e 0 54px, transparent 56px),
+    radial-gradient(circle at 92% 65%, rgba(48, 95, 174, 0.42) 0 94px, transparent 96px),
+    radial-gradient(circle at 25% 120%, rgba(31, 75, 150, 0.52) 0 120px, transparent 122px);
+}
+
+.card-surface {
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(16, 33, 61, 0.04);
+}

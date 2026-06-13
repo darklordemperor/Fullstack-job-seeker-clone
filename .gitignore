@@ -1,44 +1,26 @@
-# See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+# Root environment
+.env
+.env.local
+.env.*.local
 
-# Compiled output
-/dist
-/tmp
-/out-tsc
-/bazel-out
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/tmp/
+frontend/out-tsc/
+frontend/.angular/cache/
+frontend/coverage/
 
-# Node
-/node_modules
-npm-debug.log
-yarn-error.log
+# Backend
+backend/target/
+backend/build/
+backend/.mvn/wrapper/maven-wrapper.jar
 
-# IDEs and editors
+# Editors
 .idea/
-.project
-.classpath
-.c9/
-*.launch
-.settings/
-*.sublime-workspace
+.vscode/
+*.iml
 
-# Visual Studio Code
-.vscode/*
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-!.vscode/mcp.json
-.history/*
-
-# Miscellaneous
-/.angular/cache
-.sass-cache/
-/connect.lock
-/coverage
-/libpeerconnection.log
-testem.log
-/typings
-__screenshots__/
-
-# System files
+# System
 .DS_Store
 Thumbs.db
