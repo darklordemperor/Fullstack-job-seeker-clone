@@ -70,13 +70,13 @@ backend/src/main/resources/
 
 Backend request flow:
 
-```text
-HTTP client
-  -> interfaces/rest controller
-  -> application/usecase
-  -> domain model/service/repository port
-  -> infrastructure adapter
-  -> JPA repository/entity or storage/email/JWT boundary
+```mermaid
+flowchart LR
+    Client["HTTP client"] --> Controller["interfaces/rest<br/>thin controller"]
+    Controller --> UseCase["application/usecase<br/>orchestration"]
+    UseCase --> Domain["domain<br/>models, services, ports"]
+    Domain --> Adapter["infrastructure adapter"]
+    Adapter --> Boundary["JPA, storage,<br/>email, or JWT boundary"]
 ```
 
 Controllers stay thin, domain models stay Spring-free, JPA entities stay separate from domain models, and schema changes are owned by Flyway. API responses use the shared `ApiResponse<T>` envelope.
@@ -108,28 +108,33 @@ frontend/src/app/
 
 Frontend route schematic:
 
-```text
-/
-|-- jobs
-|   `-- :id
-|-- auth
-|   |-- login
-|   |-- register-job-seeker
-|   `-- register-employer
-|-- job-seeker              guarded by ROLE_JOB_SEEKER
-|   |-- profile
-|   |-- my-applications
-|   `-- settings
-|-- employer                guarded by ROLE_EMPLOYER
-|   |-- dashboard
-|   |-- post-job
-|   |-- manage-jobs
-|   |-- applicants/:id
-|   `-- settings
-`-- admin                   guarded by ROLE_ADMIN
-    |-- dashboard
-    |-- users
-    `-- applications
+```mermaid
+flowchart TD
+    Root["/"] --> Home["home"]
+    Root --> Jobs["jobs"]
+    Jobs --> JobDetail["jobs/:id"]
+
+    Root --> Auth["auth"]
+    Auth --> Login["login"]
+    Auth --> RegisterSeeker["register-job-seeker"]
+    Auth --> RegisterEmployer["register-employer"]
+
+    Root --> Seeker["job-seeker<br/>ROLE_JOB_SEEKER"]
+    Seeker --> SeekerProfile["profile"]
+    Seeker --> SeekerApplications["my-applications"]
+    Seeker --> SeekerSettings["settings"]
+
+    Root --> Employer["employer<br/>ROLE_EMPLOYER"]
+    Employer --> EmployerDashboard["dashboard"]
+    Employer --> PostJob["post-job"]
+    Employer --> ManageJobs["manage-jobs"]
+    Employer --> Applicants["applicants/:id"]
+    Employer --> EmployerSettings["settings"]
+
+    Root --> Admin["admin<br/>ROLE_ADMIN"]
+    Admin --> AdminDashboard["dashboard"]
+    Admin --> Users["users"]
+    Admin --> AdminApplications["applications"]
 ```
 
 Angular code uses standalone components, lazy feature routes, NgRx SignalStore, functional HTTP interceptors, strict TypeScript, and Tailwind CSS 4. Data access belongs in `frontend/src/app/data/`; shared TypeScript shapes belong in `frontend/src/app/domain/`.
