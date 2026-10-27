@@ -1,0 +1,204 @@
+name: Verify
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: verify-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: jobsdb_test
+          POSTGRES_USER: jobsdb
+          POSTGRES_PASSWORD: integration-test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jobsdb -d jobsdb_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      JOBSDB_INTEGRATION_TESTS: "true"
+      TEST_DATABASE_URL: jdbc:postgresql://localhost:5432/jobsdb_test
+      TEST_DATABASE_USER: jobsdb
+      TEST_DATABASE_PASSWORD: integration-test-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - run: chmod +x mvnw && ./mvnw --batch-mode verify
+        working-directory: backend
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-test-results
+          path: |
+            backend/target/surefire-reports
+            backend/target/site/jacoco
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm audit --audit-level=moderate
+        working-directory: frontend
+      - run: npm run test:coverage
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: jobsdb_test
+          POSTGRES_USER: jobsdb
+          POSTGRES_PASSWORD: integration-test-only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U jobsdb -d jobsdb_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      TEST_DATABASE_URL: jdbc:postgresql://127.0.0.1:5432/jobsdb_test
+      TEST_DATABASE_USER: jobsdb
+      TEST_DATABASE_PASSWORD: integration-test-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: chmod +x backend/mvnw
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium firefox webkit
+        working-directory: frontend
+      - run: npm run test:e2e -- --retries=0
+        working-directory: frontend
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-results
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+  compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose --env-file .env.example config --quiet
+      - run: docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.dev.yml config --quiet
+      - run: docker compose --env-file .env.example -p jobsdb-verification -f docker-compose.yml -f docker-compose.verify.yml config --quiet
+  production-containers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Create isolated test credentials
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p backend/target frontend/tmp/docker-verification
+          db_password="$(openssl rand -hex 24)"
+          jwt_secret="$(openssl rand -hex 48)"
+          pgadmin_password="$(openssl rand -hex 24)"
+          echo "::add-mask::$db_password"
+          echo "::add-mask::$jwt_secret"
+          echo "::add-mask::$pgadmin_password"
+          # Exercise the documented pgAdmin email so invalid defaults fail CI.
+          pgadmin_email="$(sed -n 's/^PGADMIN_EMAIL=//p' .env.example | tr -d '\r')"
+          test -n "$pgadmin_email"
+          printf 'DB_NAME=jobsdb_test\nDB_USER=jobsdb\nDB_PASS=%s\nJWT_SECRET=%s\nPGADMIN_EMAIL=%s\nPGADMIN_PASS=%s\n' \
+            "$db_password" "$jwt_secret" "$pgadmin_email" "$pgadmin_password" > backend/target/docker-verify.env
+      - name: Build and start production containers
+        run: |
+          set -euo pipefail
+          docker compose --env-file backend/target/docker-verify.env -p jobsdb-verification \
+            -f docker-compose.yml -f docker-compose.verify.yml --profile tools \
+            up --build -d postgres backend frontend pgadmin 2>&1 | tee frontend/tmp/docker-verification/build.log
+      - name: Verify production routing and workflows
+        run: node scripts/verify-docker.mjs seed --pgadmin
+        working-directory: frontend
+      - name: Recreate containers with existing volumes
+        run: |
+          docker compose --env-file backend/target/docker-verify.env -p jobsdb-verification \
+            -f docker-compose.yml -f docker-compose.verify.yml --profile tools \
+            up -d --force-recreate postgres backend frontend pgadmin
+      - name: Verify persistence after recreation
+        run: node scripts/verify-docker.mjs verify --pgadmin
+        working-directory: frontend
+      - name: Collect runtime diagnostics
+        if: always()
+        run: |
+          mkdir -p frontend/tmp/docker-verification
+          if test -f backend/target/docker-verify.env; then
+            docker compose --env-file backend/target/docker-verify.env -p jobsdb-verification \
+              -f docker-compose.yml -f docker-compose.verify.yml --profile tools \
+              ps -a > frontend/tmp/docker-verification/containers.log
+            docker compose --env-file backend/target/docker-verify.env -p jobsdb-verification \
+              -f docker-compose.yml -f docker-compose.verify.yml --profile tools \
+              logs --no-color 2>&1 | sed -E 's/(Using generated security password:).*/\1 [redacted]/' \
+              > frontend/tmp/docker-verification/runtime.log
+          fi
+      - name: Stop isolated containers
+        if: always()
+        run: |
+          if test -f backend/target/docker-verify.env; then
+            docker compose --env-file backend/target/docker-verify.env -p jobsdb-verification \
+              -f docker-compose.yml -f docker-compose.verify.yml --profile tools down
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-container-results
+          retention-days: 14
+          # Explicit allowlist: never upload state.json or the credential env file.
+          path: |
+            frontend/tmp/docker-verification/*-report.json
+            frontend/tmp/docker-verification/*.png
+            frontend/tmp/docker-verification/*.log

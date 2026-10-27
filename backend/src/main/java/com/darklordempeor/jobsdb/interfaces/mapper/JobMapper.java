@@ -8,6 +8,6 @@ import org.mapstruct.Mapper;
 public interface JobMapper {
 	default JobResponse toResponse(Job job) {
 		return new JobResponse(job.id(), job.employerId(), job.title(), job.description(), job.location(), job.salaryMin(),
-				job.salaryMax(), job.salaryCurrency(), job.status().name(), job.createdAt());
+				job.salaryMax(), job.salaryCurrency(), job.status().name(), job.createdAt(), null, 0);
 	}
 }

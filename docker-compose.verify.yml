@@ -1,0 +1,29 @@
+# Use with docker-compose.yml and a separate project: -p jobsdb-verification.
+# Credentials come from a generated test-only env file; never use the application's .env.
+services:
+  postgres:
+    container_name: !reset null
+    restart: "no"
+    environment:
+      POSTGRES_DB: jobsdb_test
+    ports: !override
+      - "127.0.0.1:${VERIFY_DB_PORT:-25432}:5432"
+  pgadmin:
+    container_name: !reset null
+    restart: "no"
+    profiles: [tools]
+    ports: !override
+      - "127.0.0.1:${VERIFY_PGADMIN_PORT:-25050}:80"
+  backend:
+    container_name: !reset null
+    restart: "no"
+    environment:
+      POSTGRES_DB: jobsdb_test
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/jobsdb_test
+    ports: !override
+      - "127.0.0.1:${VERIFY_BACKEND_PORT:-28080}:8080"
+  frontend:
+    container_name: !reset null
+    restart: "no"
+    ports: !override
+      - "127.0.0.1:${VERIFY_FRONTEND_PORT:-24200}:80"

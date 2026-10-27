@@ -1,12 +1,14 @@
 package com.darklordempeor.jobsdb.infrastructure.persistence.adapter;
 
 import com.darklordempeor.jobsdb.application.port.JobSeekerProfilePort;
-import com.darklordempeor.jobsdb.interfaces.dto.request.EducationRequest;
-import com.darklordempeor.jobsdb.interfaces.dto.request.JobSeekerProfileRequest;
-import com.darklordempeor.jobsdb.interfaces.dto.request.LanguageRequest;
-import com.darklordempeor.jobsdb.interfaces.dto.request.LicenseRequest;
-import com.darklordempeor.jobsdb.interfaces.dto.request.SkillRequest;
-import com.darklordempeor.jobsdb.interfaces.dto.request.WorkExperienceRequest;
+import com.darklordempeor.jobsdb.application.model.HiringModels.Education;
+import com.darklordempeor.jobsdb.application.model.JobSeekerProfileCommand;
+import com.darklordempeor.jobsdb.application.model.HiringModels.Language;
+import com.darklordempeor.jobsdb.application.model.HiringModels.License;
+import com.darklordempeor.jobsdb.application.model.HiringModels.Skill;
+import com.darklordempeor.jobsdb.application.model.HiringModels.Experience;
+import com.darklordempeor.jobsdb.application.model.HiringModels.Profile;
+import tools.jackson.databind.ObjectMapper;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -22,21 +24,23 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 public class JdbcJobSeekerProfileAdapter implements JobSeekerProfilePort {
 	private final JdbcTemplate jdbc;
+    private final ObjectMapper json;
 
-	public JdbcJobSeekerProfileAdapter(JdbcTemplate jdbc) {
+	public JdbcJobSeekerProfileAdapter(JdbcTemplate jdbc, ObjectMapper json) {
 		this.jdbc = jdbc;
+        this.json = json;
 	}
 
 	@Override
 	@Transactional
-	public Map<String, Object> findOrCreate(UUID userId) {
+	public Profile findOrCreate(UUID userId) {
 		UUID profileId = ensureProfile(userId);
-		return load(userId, profileId);
+		return json.convertValue(load(userId, profileId), Profile.class);
 	}
 
 	@Override
 	@Transactional
-	public Map<String, Object> update(UUID userId, JobSeekerProfileRequest request) {
+	public Profile update(UUID userId, JobSeekerProfileCommand request) {
 		UUID profileId = ensureProfile(userId);
 		jdbc.update("""
 				update job_seeker_profiles
@@ -52,15 +56,15 @@ public class JdbcJobSeekerProfileAdapter implements JobSeekerProfilePort {
 		replaceEducations(profileId, request.educations());
 		replaceLanguages(profileId, request.languages());
 		replaceLicenses(profileId, request.licenses());
-		return load(userId, profileId);
+		return json.convertValue(load(userId, profileId), Profile.class);
 	}
 
 	@Override
 	@Transactional
-	public Map<String, Object> updateImage(UUID userId, String profileImageUrl) {
+	public Profile updateImage(UUID userId, String profileImageUrl) {
 		UUID profileId = ensureProfile(userId);
 		jdbc.update("update job_seeker_profiles set profile_image_url = ?, updated_at = now() where id = ?", profileImageUrl, profileId);
-		return load(userId, profileId);
+		return json.convertValue(load(userId, profileId), Profile.class);
 	}
 
 	private UUID ensureProfile(UUID userId) {
@@ -156,17 +160,17 @@ public class JdbcJobSeekerProfileAdapter implements JobSeekerProfilePort {
 		return item;
 	}
 
-	private void replaceSkills(UUID profileId, List<SkillRequest> skills) {
+	private void replaceSkills(UUID profileId, List<Skill> skills) {
 		jdbc.update("delete from skills where job_seeker_profile_id = ?", profileId);
-		for (SkillRequest skill : items(skills)) {
+		for (Skill skill : items(skills)) {
 			jdbc.update("insert into skills (job_seeker_profile_id, name, years_of_experience, level) values (?, ?, ?, ?)",
 					profileId, skill.name(), skill.yearsOfExperience(), skill.level());
 		}
 	}
 
-	private void replaceWorkExperiences(UUID profileId, List<WorkExperienceRequest> experiences) {
+	private void replaceWorkExperiences(UUID profileId, List<Experience> experiences) {
 		jdbc.update("delete from work_experiences where job_seeker_profile_id = ?", profileId);
-		for (WorkExperienceRequest experience : items(experiences)) {
+		for (Experience experience : items(experiences)) {
 			jdbc.update("""
 					insert into work_experiences (job_seeker_profile_id, company, title, start_date, end_date, description)
 					values (?, ?, ?, ?, ?, ?)
@@ -174,9 +178,9 @@ public class JdbcJobSeekerProfileAdapter implements JobSeekerProfilePort {
 		}
 	}
 
-	private void replaceEducations(UUID profileId, List<EducationRequest> educations) {
+	private void replaceEducations(UUID profileId, List<Education> educations) {
 		jdbc.update("delete from educations where job_seeker_profile_id = ?", profileId);
-		for (EducationRequest education : items(educations)) {
+		for (Education education : items(educations)) {
 			jdbc.update("""
 					insert into educations (job_seeker_profile_id, institution, degree, field_of_study, graduation_year)
 					values (?, ?, ?, ?, ?)
@@ -184,17 +188,17 @@ public class JdbcJobSeekerProfileAdapter implements JobSeekerProfilePort {
 		}
 	}
 
-	private void replaceLanguages(UUID profileId, List<LanguageRequest> languages) {
+	private void replaceLanguages(UUID profileId, List<Language> languages) {
 		jdbc.update("delete from languages where job_seeker_profile_id = ?", profileId);
-		for (LanguageRequest language : items(languages)) {
+		for (Language language : items(languages)) {
 			jdbc.update("insert into languages (job_seeker_profile_id, language, proficiency) values (?, ?, ?)",
 					profileId, language.language(), language.proficiency());
 		}
 	}
 
-	private void replaceLicenses(UUID profileId, List<LicenseRequest> licenses) {
+	private void replaceLicenses(UUID profileId, List<License> licenses) {
 		jdbc.update("delete from licenses where job_seeker_profile_id = ?", profileId);
-		for (LicenseRequest license : items(licenses)) {
+		for (License license : items(licenses)) {
 			jdbc.update("""
 					insert into licenses (job_seeker_profile_id, name, issuer, issued_year, expires_year, description)
 					values (?, ?, ?, ?, ?, ?)

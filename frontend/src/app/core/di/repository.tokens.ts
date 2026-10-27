@@ -1,0 +1,26 @@
+import { InjectionToken } from '@angular/core';
+import { HiringAnalyticsRepositoryPort } from '../../domain/repositories/hiring-analytics.repository.port';
+export const HIRING_ANALYTICS_REPOSITORY = new InjectionToken<HiringAnalyticsRepositoryPort>('HiringAnalyticsRepository');
+import { ScorecardRepositoryPort } from '../../domain/repositories/scorecard.repository.port';
+export const SCORECARD_REPOSITORY = new InjectionToken<ScorecardRepositoryPort>('ScorecardRepository');
+import { ResumeRepositoryPort } from '../../domain/repositories/resume.repository.port';
+export const RESUME_REPOSITORY = new InjectionToken<ResumeRepositoryPort>('ResumeRepository');
+import { SavedSearchRepositoryPort } from '../../domain/repositories/saved-search.repository.port';
+export const SAVED_SEARCH_REPOSITORY = new InjectionToken<SavedSearchRepositoryPort>('SavedSearchRepository');
+import { NotificationRepositoryPort } from '../../domain/repositories/notification.repository.port';
+export const NOTIFICATION_REPOSITORY = new InjectionToken<NotificationRepositoryPort>('NotificationRepository');
+import { InterviewRepositoryPort } from '../../domain/repositories/interview.repository.port';
+export const INTERVIEW_REPOSITORY = new InjectionToken<InterviewRepositoryPort>('InterviewRepository');
+import { AdminRepositoryPort } from '../../domain/repositories/admin.repository.port';
+import { AuthRepositoryPort } from '../../domain/repositories/auth.repository.port';
+import { EmployerRepositoryPort } from '../../domain/repositories/employer.repository.port';
+import { JobRepositoryPort } from '../../domain/repositories/job.repository.port';
+import { JobSeekerRepositoryPort } from '../../domain/repositories/job-seeker.repository.port';
+import { SessionRepositoryPort } from '../../domain/repositories/session.repository.port';
+
+export const ADMIN_REPOSITORY = new InjectionToken<AdminRepositoryPort>('AdminRepository');
+export const AUTH_REPOSITORY = new InjectionToken<AuthRepositoryPort>('AuthRepository');
+export const EMPLOYER_REPOSITORY = new InjectionToken<EmployerRepositoryPort>('EmployerRepository');
+export const JOB_REPOSITORY = new InjectionToken<JobRepositoryPort>('JobRepository');
+export const JOB_SEEKER_REPOSITORY = new InjectionToken<JobSeekerRepositoryPort>('JobSeekerRepository');
+export const SESSION_REPOSITORY = new InjectionToken<SessionRepositoryPort>('SessionRepository');

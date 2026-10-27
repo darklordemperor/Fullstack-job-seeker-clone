@@ -13,5 +13,5 @@ public record JobResponse(
 		Integer salaryMax,
 		String salaryCurrency,
 		String status,
-		Instant createdAt) {
+		Instant createdAt, String companyName, long applicants) {
 }

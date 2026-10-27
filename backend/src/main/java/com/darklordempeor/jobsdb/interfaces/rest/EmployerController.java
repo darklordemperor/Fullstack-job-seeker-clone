@@ -1,16 +1,16 @@
 package com.darklordempeor.jobsdb.interfaces.rest;
 
+import com.darklordempeor.jobsdb.interfaces.mapper.ApiCommandMapper;
 import com.darklordempeor.jobsdb.application.usecase.employer.EmployerUseCase;
 import com.darklordempeor.jobsdb.interfaces.dto.request.EmployerProfileRequest;
 import com.darklordempeor.jobsdb.interfaces.dto.request.JobRequest;
 import com.darklordempeor.jobsdb.interfaces.dto.request.JobStatusRequest;
 import com.darklordempeor.jobsdb.interfaces.dto.response.ApiResponse;
 import com.darklordempeor.jobsdb.interfaces.dto.response.JobResponse;
-import com.darklordempeor.jobsdb.interfaces.mapper.JobMapper;
+import com.darklordempeor.jobsdb.interfaces.mapper.JobResponseAssembler;
 import jakarta.validation.Valid;
 import java.security.Principal;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -24,32 +24,34 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping
 public class EmployerController {
+    private final ApiCommandMapper commands;
 	private final EmployerUseCase employer;
-	private final JobMapper mapper;
+	private final JobResponseAssembler mapper;
 
-	public EmployerController(EmployerUseCase employer, JobMapper mapper) {
+	public EmployerController(ApiCommandMapper commands, EmployerUseCase employer, JobResponseAssembler mapper) {
+        this.commands = commands;
 		this.employer = employer;
 		this.mapper = mapper;
 	}
 
 	@GetMapping("/api/employer/profile")
-	public ApiResponse<Map<String, Object>> profile(Principal principal) {
+	public ApiResponse<com.darklordempeor.jobsdb.application.model.HiringModels.Company> profile(Principal principal) {
 		return ApiResponse.success(employer.profile(UUID.fromString(principal.getName())), "Employer profile loaded");
 	}
 
 	@PutMapping("/api/employer/profile")
-	public ApiResponse<Map<String, Object>> updateProfile(Principal principal, @Valid @RequestBody EmployerProfileRequest request) {
-		return ApiResponse.success(employer.updateProfile(UUID.fromString(principal.getName()), request), "Employer profile updated");
+	public ApiResponse<com.darklordempeor.jobsdb.application.model.HiringModels.Company> updateProfile(Principal principal, @Valid @RequestBody EmployerProfileRequest request) {
+		return ApiResponse.success(employer.updateProfile(UUID.fromString(principal.getName()), commands.toCommand(request)), "Employer profile updated");
 	}
 
 	@PostMapping("/api/jobs")
 	public ApiResponse<JobResponse> createJob(Principal principal, @Valid @RequestBody JobRequest request) {
-		return ApiResponse.success(mapper.toResponse(employer.createJob(UUID.fromString(principal.getName()), request)), "Job created");
+		return ApiResponse.success(mapper.toResponse(employer.createJob(UUID.fromString(principal.getName()), commands.toCommand(request))), "Job created");
 	}
 
 	@PutMapping("/api/jobs/{id}")
 	public ApiResponse<JobResponse> updateJob(Principal principal, @PathVariable UUID id, @Valid @RequestBody JobRequest request) {
-		return ApiResponse.success(mapper.toResponse(employer.updateJob(UUID.fromString(principal.getName()), id, request)), "Job updated");
+		return ApiResponse.success(mapper.toResponse(employer.updateJob(UUID.fromString(principal.getName()), id, commands.toCommand(request))), "Job updated");
 	}
 
 	@PatchMapping("/api/jobs/{id}/status")
@@ -59,12 +61,8 @@ public class EmployerController {
 
 	@GetMapping("/api/employer/jobs")
 	public ApiResponse<List<JobResponse>> jobs(Principal principal) {
-		var data = employer.employerJobs(UUID.fromString(principal.getName())).stream().map(mapper::toResponse).toList();
+		var data = mapper.toResponses(employer.employerJobs(UUID.fromString(principal.getName())));
 		return ApiResponse.success(data, "Employer jobs loaded");
 	}
 
-	@GetMapping("/api/employer/jobs/{id}/applicants")
-	public ApiResponse<List<Object>> applicants(@PathVariable UUID id) {
-		return ApiResponse.success(List.of(), "Applicants loaded");
-	}
 }

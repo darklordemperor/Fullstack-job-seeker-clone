@@ -1,52 +1,60 @@
 package com.darklordempeor.jobsdb.application.usecase.auth;
 
 import com.darklordempeor.jobsdb.application.port.JwtPort;
-import com.darklordempeor.jobsdb.domain.exception.DomainException;
+import com.darklordempeor.jobsdb.domain.exception.UnauthorizedException;
 import com.darklordempeor.jobsdb.domain.model.User;
 import com.darklordempeor.jobsdb.domain.model.UserRole;
 import com.darklordempeor.jobsdb.domain.repository.UserRepository;
 import com.darklordempeor.jobsdb.domain.service.UserDomainService;
-import com.darklordempeor.jobsdb.interfaces.dto.request.LoginRequest;
-import com.darklordempeor.jobsdb.interfaces.dto.request.RegisterRequest;
-import com.darklordempeor.jobsdb.interfaces.dto.response.AuthResponse;
+import com.darklordempeor.jobsdb.application.model.LoginCommand;
+import com.darklordempeor.jobsdb.application.model.RegisterCommand;
+import com.darklordempeor.jobsdb.application.model.AuthTokens;
 import java.time.Instant;
 import java.util.UUID;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import com.darklordempeor.jobsdb.application.port.PasswordHashPort;
 import org.springframework.stereotype.Service;
 
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class AuthUseCase {
 	private final UserRepository users;
-	private final PasswordEncoder passwordEncoder;
+	private final PasswordHashPort passwordEncoder;
 	private final JwtPort jwt;
 	private final UserDomainService userDomainService = new UserDomainService();
 
-	public AuthUseCase(UserRepository users, PasswordEncoder passwordEncoder, JwtPort jwt) {
+	public AuthUseCase(UserRepository users, PasswordHashPort passwordEncoder, JwtPort jwt) {
 		this.users = users;
 		this.passwordEncoder = passwordEncoder;
 		this.jwt = jwt;
 	}
 
-	public AuthResponse register(RegisterRequest request, UserRole role) {
+	public AuthTokens register(RegisterCommand request, UserRole role) {
 		userDomainService.ensureEmailAvailable(users, request.email());
 		User user = new User(UUID.randomUUID(), request.email(), passwordEncoder.encode(request.password()), role, false, Instant.now());
 		User saved = users.save(user);
 		return tokens(saved);
 	}
 
-	public AuthResponse login(LoginRequest request) {
-		User user = users.findByEmail(request.email()).orElseThrow(() -> new DomainException("Invalid credentials"));
+	public AuthTokens login(LoginCommand request) {
+		User user = users.findByEmail(request.email()).orElseThrow(() -> new UnauthorizedException("Invalid credentials"));
 		if (user.banned() || !passwordEncoder.matches(request.password(), user.passwordHash())) {
-			throw new DomainException("Invalid credentials");
+			throw new UnauthorizedException("Invalid credentials");
 		}
 		return tokens(user);
 	}
 
-	public AuthResponse refresh(String refreshToken) {
-		return new AuthResponse(null, refreshToken, "Bearer");
+	public AuthTokens refresh(String refreshToken) {
+        User user = users.findById(jwt.consumeRefreshToken(refreshToken))
+                .filter(candidate -> !candidate.banned())
+                .orElseThrow(() -> new UnauthorizedException("Session is no longer valid"));
+        return tokens(user);
 	}
 
-	private AuthResponse tokens(User user) {
-		return new AuthResponse(jwt.createAccessToken(user), jwt.createRefreshToken(user), "Bearer");
+    public void logout(String refreshToken) {
+        jwt.revokeRefreshToken(refreshToken);
+    }
+
+	private AuthTokens tokens(User user) {
+		return new AuthTokens(jwt.createAccessToken(user), jwt.createRefreshToken(user), "Bearer");
 	}
 }

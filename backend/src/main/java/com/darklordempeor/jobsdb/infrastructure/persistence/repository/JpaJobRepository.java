@@ -22,7 +22,7 @@ public interface JpaJobRepository extends JpaRepository<JobEntity, UUID> {
 				or lower(j.title) like lower(concat('%', :query, '%'))
 				or lower(j.description) like lower(concat('%', :query, '%')))
 			and (:location = '' or lower(j.location) like lower(concat('%', :location, '%')))
-			order by j.createdAt desc
+			order by j.createdAt desc, j.id
 			""")
 	List<JobEntity> findPublicJobs(@Param("query") String query, @Param("location") String location, Pageable pageable);
 

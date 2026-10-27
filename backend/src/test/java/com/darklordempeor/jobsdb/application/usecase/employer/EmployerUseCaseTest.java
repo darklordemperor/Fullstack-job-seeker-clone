@@ -10,8 +10,8 @@ import com.darklordempeor.jobsdb.domain.exception.ResourceNotFoundException;
 import com.darklordempeor.jobsdb.domain.model.Job;
 import com.darklordempeor.jobsdb.domain.model.JobStatus;
 import com.darklordempeor.jobsdb.domain.repository.JobRepository;
-import com.darklordempeor.jobsdb.interfaces.dto.request.EmployerProfileRequest;
-import com.darklordempeor.jobsdb.interfaces.dto.request.JobRequest;
+import com.darklordempeor.jobsdb.application.model.EmployerProfileCommand;
+import com.darklordempeor.jobsdb.application.model.JobCommand;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -26,31 +26,34 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class EmployerUseCaseTest {
 	@Mock
 	private JobRepository jobs;
+    @Mock private com.darklordempeor.jobsdb.application.port.CompanyPort hiring;
 	private EmployerUseCase useCase;
 
 	@BeforeEach
 	void setUp() {
-		useCase = new EmployerUseCase(jobs);
+		useCase = new EmployerUseCase(jobs, hiring, new JobEnrichment(ids -> java.util.Map.of()), org.mockito.Mockito.mock(com.darklordempeor.jobsdb.application.port.SavedSearchPort.class));
 	}
 
 	@Test
 	void profileMethodsReturnUserData() {
 		UUID userId = UUID.randomUUID();
-		EmployerProfileRequest request = new EmployerProfileRequest("Company", "https://example.com", "Description", "Bangkok");
+		EmployerProfileCommand request = new EmployerProfileCommand("Company", "https://example.com", "Description", "Bangkok");
 
-		assertThat(useCase.profile(userId)).containsEntry("userId", userId);
-		assertThat(useCase.updateProfile(userId, request))
-				.containsEntry("userId", userId)
-				.containsEntry("profile", request);
+        var expected = new com.darklordempeor.jobsdb.application.model.HiringModels.Company(userId, "Company", "https://example.com", "Description", "Bangkok");
+        when(hiring.company(userId)).thenReturn(expected);
+        when(hiring.saveCompany(expected)).thenReturn(expected);
+        assertThat(useCase.profile(userId)).isEqualTo(expected);
+        assertThat(useCase.updateProfile(userId, request)).isEqualTo(expected);
+        verify(hiring).saveCompany(expected);
 	}
 
 	@Test
 	void createJobBuildsDraftJob() {
 		UUID employerId = UUID.randomUUID();
-		JobRequest request = request("New title");
+		JobCommand request = request("New title");
 		when(jobs.save(org.mockito.ArgumentMatchers.any(Job.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		Job saved = useCase.createJob(employerId, request);
+		Job saved = useCase.createJob(employerId, request).job();
 
 		assertThat(saved.id()).isNotNull();
 		assertThat(saved.employerId()).isEqualTo(employerId);
@@ -66,7 +69,7 @@ class EmployerUseCaseTest {
 		when(jobs.findById(existing.id())).thenReturn(Optional.of(existing));
 		when(jobs.save(org.mockito.ArgumentMatchers.any(Job.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		Job saved = useCase.updateJob(employerId, existing.id(), request("Updated"));
+		Job saved = useCase.updateJob(employerId, existing.id(), request("Updated")).job();
 
 		assertThat(saved.title()).isEqualTo("Updated");
 		assertThat(saved.status()).isEqualTo(JobStatus.ACTIVE);
@@ -80,7 +83,7 @@ class EmployerUseCaseTest {
 		when(jobs.findById(existing.id())).thenReturn(Optional.of(existing));
 		when(jobs.save(org.mockito.ArgumentMatchers.any(Job.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-		Job saved = useCase.updateStatus(employerId, existing.id(), JobStatus.ACTIVE);
+		Job saved = useCase.updateStatus(employerId, existing.id(), JobStatus.ACTIVE).job();
 
 		assertThat(saved).isEqualTo(new Job(existing.id(), existing.employerId(), existing.title(), existing.description(),
 				existing.location(), existing.salaryMin(), existing.salaryMax(), existing.salaryCurrency(), JobStatus.ACTIVE,
@@ -107,12 +110,12 @@ class EmployerUseCaseTest {
 		List<Job> expected = List.of(job(employerId, JobStatus.ACTIVE));
 		when(jobs.findByEmployerId(employerId)).thenReturn(expected);
 
-		assertThat(useCase.employerJobs(employerId)).isSameAs(expected);
+		assertThat(useCase.employerJobs(employerId)).extracting(view -> view.job()).containsExactlyElementsOf(expected);
 		verify(jobs).findByEmployerId(employerId);
 	}
 
-	private JobRequest request(String title) {
-		return new JobRequest(title, "Description", "Bangkok", 100, 200, "THB");
+	private JobCommand request(String title) {
+		return new JobCommand(title, "Description", "Bangkok", 100, 200, "THB");
 	}
 
 	private Job job(UUID employerId, JobStatus status) {

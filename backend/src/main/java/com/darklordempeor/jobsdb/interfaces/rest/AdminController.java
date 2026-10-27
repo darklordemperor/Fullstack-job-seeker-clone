@@ -1,8 +1,7 @@
 package com.darklordempeor.jobsdb.interfaces.rest;
 
+import com.darklordempeor.jobsdb.interfaces.mapper.ApiCommandMapper;
 import com.darklordempeor.jobsdb.application.usecase.admin.AdminUseCase;
-import com.darklordempeor.jobsdb.domain.repository.ApplicationRepository;
-import com.darklordempeor.jobsdb.domain.repository.UserRepository;
 import com.darklordempeor.jobsdb.interfaces.dto.request.BanUserRequest;
 import com.darklordempeor.jobsdb.interfaces.dto.request.DeleteApplicationRequest;
 import com.darklordempeor.jobsdb.interfaces.dto.response.AdminStatsResponse;
@@ -27,29 +26,27 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin")
 public class AdminController {
+    private final ApiCommandMapper commands;
 	private final AdminUseCase admin;
-	private final UserRepository users;
-	private final ApplicationRepository applications;
 	private final UserMapper userMapper;
 	private final ApplicationMapper applicationMapper;
 
-	public AdminController(AdminUseCase admin, UserRepository users, ApplicationRepository applications, UserMapper userMapper,
+	public AdminController(ApiCommandMapper commands, AdminUseCase admin, UserMapper userMapper,
 			ApplicationMapper applicationMapper) {
+        this.commands = commands;
 		this.admin = admin;
-		this.users = users;
-		this.applications = applications;
 		this.userMapper = userMapper;
 		this.applicationMapper = applicationMapper;
 	}
 
 	@GetMapping("/stats")
 	public ApiResponse<AdminStatsResponse> stats() {
-		return ApiResponse.success(admin.stats(), "Admin stats loaded");
+		return ApiResponse.success(commands.toResponse(admin.stats()), "Admin stats loaded");
 	}
 
 	@GetMapping("/users")
 	public ApiResponse<List<UserResponse>> users() {
-		return ApiResponse.success(users.findAll().stream().map(userMapper::toResponse).toList(), "Users loaded");
+		return ApiResponse.success(admin.allUsers().stream().map(userMapper::toResponse).toList(), "Users loaded");
 	}
 
 	@PostMapping("/users/{id}/ban")
@@ -66,14 +63,24 @@ public class AdminController {
 
 	@GetMapping("/applications")
 	public ApiResponse<List<ApplicationResponse>> applications() {
-		return ApiResponse.success(applications.findAll().stream().map(applicationMapper::toResponse).toList(), "Applications loaded");
+		return ApiResponse.success(admin.allApplications().stream().map(applicationMapper::toResponse).toList(), "Applications loaded");
 	}
 
 	@DeleteMapping("/applications/{id}")
-	public ApiResponse<Void> deleteApplication(@PathVariable UUID id, @Valid @RequestBody DeleteApplicationRequest request) {
-		admin.deleteApplication(id, request.reason());
+	public ApiResponse<Void> deleteApplication(Principal principal, @PathVariable UUID id, @Valid @RequestBody DeleteApplicationRequest request) {
+		admin.deleteApplication(UUID.fromString(principal.getName()), id, request.reason());
 		return ApiResponse.success(null, "Application deleted");
 	}
+    @GetMapping("/users/page")
+    public ApiResponse<com.darklordempeor.jobsdb.application.model.HiringModels.Page<com.darklordempeor.jobsdb.application.model.HiringModels.UserView>> usersPage(
+        @org.springframework.web.bind.annotation.RequestParam(defaultValue="0") int page, @org.springframework.web.bind.annotation.RequestParam(defaultValue="8") int size) {
+        return ApiResponse.success(admin.users(page,size), "Users loaded");
+    }
+    @GetMapping("/applications/page")
+    public ApiResponse<com.darklordempeor.jobsdb.application.model.HiringModels.Page<com.darklordempeor.jobsdb.application.model.HiringModels.ApplicationView>> applicationsPage(
+        @org.springframework.web.bind.annotation.RequestParam(defaultValue="0") int page, @org.springframework.web.bind.annotation.RequestParam(defaultValue="8") int size) {
+        return ApiResponse.success(admin.applications(page,size), "Applications loaded");
+    }
 
 	@PatchMapping("/jobs/{id}/close")
 	public ApiResponse<Void> closeJob(@PathVariable UUID id) {

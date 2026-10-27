@@ -13,6 +13,7 @@ Fullstack-job-seeker-clone/
 |   `-- pom.xml              Maven build
 |-- frontend/                Angular 21 web app
 |   |-- src/app/             routes, features, data repositories, domain models
+|   |-- e2e/                 Playwright workflows and responsive matrix
 |   |-- public/              static public assets
 |   |-- nginx.conf           production reverse proxy and SPA routing
 |   `-- package.json         npm scripts and dependencies
@@ -39,7 +40,8 @@ backend/src/main/java/com/darklordempeor/jobsdb/
 |   |-- service/             domain services
 |   `-- exception/           domain exceptions
 |-- application/
-|   |-- port/                application-facing external ports
+|   |-- model/               commands, results, hiring projections and snapshots
+|   |-- port/                focused persistence, password, token and storage contracts
 |   `-- usecase/             auth, admin, employer, and job-seeker orchestration
 |-- infrastructure/
 |   |-- persistence/
@@ -65,10 +67,11 @@ backend/src/main/resources/
     |-- V1__init_schema.sql
     |-- V2__seed_admin.sql
     |-- V3__reset_seed_admin_password.sql
-    `-- V4__profile_fields_certifications_and_seed_jobs.sql
+    |-- V4__profile_fields_certifications_and_seed_jobs.sql
+    `-- V5__hiring_workflows.sql
 ```
 
-Backend layer schematic:
+Backend source dependencies (arrows point toward the dependency):
 
 ```mermaid
 flowchart TB
@@ -108,10 +111,11 @@ flowchart TB
     UseCases --> AppPorts
     UseCases --> RepoPorts
     DomainServices --> Models
-    RepoPorts --> Adapters
-    AppPorts --> Security
-    AppPorts --> Storage
-    AppPorts --> Email
+    Adapters --> RepoPorts
+    Adapters --> AppPorts
+    Security --> AppPorts
+    Storage --> AppPorts
+    Email --> AppPorts
     Adapters --> JpaRepos
     JpaRepos --> Entities
 ```
@@ -127,7 +131,9 @@ flowchart LR
     Adapter --> Boundary["JPA, storage,<br/>email, or JWT boundary"]
 ```
 
-Controllers stay thin, domain models stay Spring-free, JPA entities stay separate from domain models, and schema changes are owned by Flyway. API responses use the shared `ApiResponse<T>` envelope.
+Controllers validate HTTP DTOs and map them to application-owned commands. Use cases return application results; response mappers perform no database access. Domain models stay Spring-free, JPA entities stay separate from domain models, and schema changes are owned by Flyway. API responses use the shared `ApiResponse<T>` envelope. The request-flow arrows above show runtime calls through ports; infrastructure implements those ports and depends inward.
+
+This is a pragmatic Clean Architecture: backend use cases retain Spring service/transaction annotations, while domain models, application commands/results, and ports remain framework-free. See [the architecture guide](contracts/CLEAN_ARCHITECTURE.md) for concrete request flows, changed files, and automated boundary checks.
 
 ## Frontend Structure
 
@@ -136,18 +142,22 @@ frontend/src/app/
 |-- app.routes.ts            top-level lazy route configuration
 |-- app.config.ts            app providers and HTTP interceptor setup
 |-- core/
+|   |-- di/                  repository tokens, live adapter bindings and use-case factories
 |   |-- auth/                auth service, SignalStore, and role guard
 |   |-- http/                functional JWT and error interceptors
 |   |-- i18n/                language service
+|   |-- notifications/       session-scoped inbox state and unread badge
 |   `-- layout/              shell, navbar, sidebar, and footer
-|-- data/                    API repositories
-|-- domain/                  TypeScript interfaces and API models
+|-- application/use-cases/   framework-independent workflow logic
+|-- data/                    HTTP repository implementations, wire DTOs and request mappers
+|-- domain/                  models, transition rules and repository interfaces
 |-- features/
 |   |-- home/                public landing/search entry
 |   |-- auth/                login and registration
 |   |-- jobs/                public job list, filters, and details
-|   |-- job-seeker/          profile, avatar upload, applications, settings
-|   |-- employer/            dashboard, post/manage jobs, applicants, settings
+|   |-- job-seeker/          profile/work history, avatars, private résumés, saved jobs/searches, applications, interviews, settings
+|   |-- employer/            dashboard, hiring analytics, post/manage jobs, applicants, interview scorecards, settings
+|   |-- notifications/       private inbox, unread filtering and record links
 |   `-- admin/               dashboard, users, bans, application moderation
 `-- shared/
     |-- pipes/               display formatting pipes
@@ -170,6 +180,8 @@ flowchart TD
     Root --> Seeker["job-seeker<br/>ROLE_JOB_SEEKER"]
     Seeker --> SeekerProfile["profile"]
     Seeker --> SeekerApplications["my-applications"]
+    Seeker --> SeekerSavedJobs["saved-jobs"]
+    Seeker --> SeekerInterviews["interviews"]
     Seeker --> SeekerSettings["settings"]
 
     Root --> Employer["employer<br/>ROLE_EMPLOYER"]
@@ -177,6 +189,7 @@ flowchart TD
     Employer --> PostJob["post-job"]
     Employer --> ManageJobs["manage-jobs"]
     Employer --> Applicants["applicants/:id"]
+    Employer --> EmployerInterviews["interviews"]
     Employer --> EmployerSettings["settings"]
 
     Root --> Admin["admin<br/>ROLE_ADMIN"]
@@ -187,6 +200,20 @@ flowchart TD
 
 Angular code uses standalone components, lazy feature routes, NgRx SignalStore, functional HTTP interceptors, strict TypeScript, and Tailwind CSS 4. Data access belongs in `frontend/src/app/data/`; shared TypeScript shapes belong in `frontend/src/app/domain/`.
 
+Features inject repository tokens instead of concrete HTTP classes. `app.config.ts` installs the bindings from `core/di/repository.providers.ts`. The applicant screen delegates loading and saving to `ApplicantsStore`, which calls `ReviewApplicantUseCase` for transition rules. Simple queries can use repository contracts directly without an extra forwarding use case. Contracts use RxJS observables but have no Angular imports.
+
+```mermaid
+flowchart LR
+    Component["Applicant component"] --> Store["ApplicantsStore"]
+    Store --> UseCase["ReviewApplicantUseCase"]
+    UseCase --> Port["EmployerRepositoryPort"]
+    Adapter["HTTP EmployerRepository"] -. implements .-> Port
+    Composition["core/di bindings"] --> Adapter
+    Adapter --> API["Spring REST API"]
+```
+
+`npm run check:architecture` checks frontend imports and runs automatically before tests/builds. Backend `ArchitectureTest` checks layer boundaries during `./mvnw test`. These source checks supplement behavior and integration tests.
+
 ## Features
 
 ### Public And Authentication
@@ -194,26 +221,32 @@ Angular code uses standalone components, lazy feature routes, NgRx SignalStore, 
 - Browse active jobs with pagination and keyword or location filtering.
 - View public job detail pages.
 - Register as a job seeker or employer.
-- Log in with stateless JWT authentication and refresh tokens.
+- Log in with stateless access tokens, single-use refresh-token rotation, and logout revocation.
+- Search from the home page and share job filters through URL query parameters.
+- Live API failures show errors; sample data is never substituted for a failed request. Optional sample mode is disabled by default.
 
 ### Job Seeker
 
+- Browse a paginated saved-jobs shortlist, remove saved jobs, and see closed/unavailable states.
 - Edit profile details including personal information, location, summary, expected salary, resume URL, skills, work experience, education, languages, and licences or certifications.
 - Upload a JPG or PNG profile image up to 5 MB. The backend crops and resizes it to a `256 x 256` PNG.
-- Apply for jobs and review submitted applications.
-- Open settings. The current settings screen updates local UI state only and does not persist to the backend yet.
+- Apply to active jobs, save/unsave jobs, and follow a paginated application history.
+- Preserve the profile details submitted with each application, even after later profile edits.
+- Save contact and opt-in preferences. Profile discovery and recommendation delivery are not available yet; the settings screen makes this explicit.
 
 ### Employer
 
 - Edit company profile settings.
 - Create, update, publish, close, and review owned jobs.
-- Open an applicant list for a job. The current backend endpoint returns an empty placeholder list.
+- Review a paginated applicant pipeline with stage filters, submitted-profile snapshots, and private notes.
+- Move applicants from Submitted to Reviewing or Rejected, then from Reviewing to Hired or Rejected, with concurrency protection and status history.
+- View dashboard counts derived from owned jobs and applications.
 
 ### Admin
 
 - Review dashboard statistics.
-- List users, ban users with a reason, and lift bans.
-- Review and delete job applications with an audit reason.
+- Page through users, ban users with an audited reason, and lift bans.
+- Page through applications and delete them with a persisted audit reason.
 - Close jobs.
 
 ## Technology
@@ -255,6 +288,8 @@ Copy-Item .env.example .env
 
 Update placeholder secrets in `.env`, then start PostgreSQL and pgAdmin:
 
+Use a valid email such as `admin@example.com` for `PGADMIN_EMAIL`; pgAdmin rejects reserved suffixes such as `.local`. This pgAdmin login is separate from the application's seeded `admin@jobsdb.local` account.
+
 ```powershell
 docker compose up -d postgres pgadmin
 ```
@@ -286,6 +321,8 @@ Local URLs:
 
 The Angular development server proxies `/api` and `/uploads` to `http://localhost:8080`.
 
+Linux equivalents: `cp .env.example .env`, `cd backend && ./mvnw spring-boot:run`, and `cd frontend && npm ci && npm start`.
+
 ## Seed Data
 
 Flyway creates:
@@ -308,6 +345,8 @@ Flyway creates:
 
 ## Docker
 
+See [the hiring API contract](contracts/HIRING_WORKFLOWS.md) for new endpoints, response examples, validation, auth rules, and compatibility notes. The [implementation summary](contracts/IMPLEMENTATION_SUMMARY.md) records the changes and verification evidence.
+
 Start the complete production-like stack:
 
 ```powershell
@@ -321,6 +360,10 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
 Docker Compose persists PostgreSQL data, pgAdmin data, and uploaded profile images in named volumes. Do not run `docker compose down -v` unless you intend to delete that local data.
+
+For isolated production-container smoke tests, use [Production container verification](contracts/DOCKER_VERIFICATION.md). It uses a separate Compose project, `jobsdb_test`, loopback ports, and dedicated volumes to verify Nginx routing, avatar uploads, Angular deep links and persistence after recreation.
+
+The existing local stack was upgraded from Flyway V4 to V7, then V8 for notifications, V9 for saved searches, V10 for private résumé versions and V11 for interview scorecards. Each upgrade included backup/restore and preservation checks. See [the original upgrade](contracts/LOCAL_UPGRADE.md), [the notification release](contracts/NOTIFICATIONS.md#local-deployment), [the saved-search release](contracts/SAVED_SEARCHES.md#local-deployment), [the résumé release](contracts/RESUME_VERSIONS.md#local-deployment), and [the current scorecard release](contracts/SCORECARDS.md#local-deployment) for recovery evidence.
 
 If port `5432` is already in use, change `DB_PORT` in `.env`, for example to `5433`.
 
@@ -338,14 +381,15 @@ The production frontend image builds Angular and serves generated files through 
 Nginx enables gzip compression and accepts request bodies up to `7m`. This matches the backend multipart request limit while the profile-image storage adapter applies the stricter 5 MB image limit.
 
 During local `npm.cmd start` development, Angular uses `frontend/proxy.conf.json` to forward `/api` and `/uploads` to `http://localhost:8080`.
+The hot-reload Docker frontend uses `frontend/proxy.docker.conf.json`, which targets `http://backend:8080` on the Compose network.
 
 ## Verification
 
-Backend tests:
+Backend tests and measured coverage:
 
 ```powershell
 cd backend
-.\mvnw.cmd test
+.\mvnw.cmd verify
 ```
 
 Frontend production build:
@@ -359,5 +403,25 @@ Frontend tests:
 
 ```powershell
 cd frontend
-npm.cmd test -- --watch=false
+npm.cmd run test:coverage
 ```
+
+Database integration tests are opt-in locally. Use an isolated `jobsdb_test` database and the environment variables documented in [Hiring workflows](contracts/HIRING_WORKFLOWS.md#verification). The GitHub Actions workflow runs the backend suite and coverage gate against PostgreSQL 17, frontend tests/build, Playwright browser tests, three Compose configuration checks, and production-container smoke tests including pgAdmin and persistence after recreation. See [Testing and coverage](contracts/TESTING.md) for commands, viewport scope, database safeguards, and report locations.
+
+Current boundaries: submitted résumé/avatar URLs are preserved, but the linked files are not archived; legacy unpaged APIs remain available for compatibility. Access/refresh tokens retain the existing localStorage transport. See the contract for migration and session details.
+
+### Interview scheduling
+
+Employers can propose up to three interview slots from applicant review. Candidates accept a time or decline; both sides can cancel, and employers can reschedule with fresh candidate confirmation. Interview pages show upcoming/history views and confirmed meetings can be downloaded as calendar files. Confirmed overlaps are checked transactionally. See [Interview scheduling](contracts/INTERVIEW_SCHEDULING.md) for API contracts, timezone behavior, migration details and verification.
+
+Employers can record completed/no-show outcomes after an interview ends and schedule subsequent rounds. Both participants can inspect prior schedules in the revision-history drawer. Frontend tests now produce measured coverage with CI thresholds. See [Interview lifecycle and coverage](contracts/INTERVIEW_LIFECYCLE_AND_COVERAGE.md) for rules, API additions and verification.
+
+The authenticated notification bell opens a private inbox for job matches, application and interview updates. Filter unread items, mark them read and open the linked job, application or interview. Events are stored with the triggering workflow transaction; internal hiring notes stay private. See [In-app notifications](contracts/NOTIFICATIONS.md) for endpoints and verification. Email and push delivery are outside this feature.
+
+Candidates can save keyword, location and salary criteria, view current matching jobs and pause/resume in-app job alerts. First publication delivers one alert per candidate/job even when several searches match. Existing public search contracts remain unchanged. See [Saved searches and alerts](contracts/SAVED_SEARCHES.md) for V9 schema, matching rules, API examples and verification.
+
+Candidates can upload private PDF résumé versions and choose one for future applications. Each submission preserves that exact PDF; employers download it through ownership-checked API routes. Unused versions can be deleted, while submitted attachments are retained. Existing external résumé links remain supported. See [Private résumé versions](contracts/RESUME_VERSIONS.md) for limits, V10 schema, API contracts and verification.
+
+Employers can record private interview scorecards with three ratings, evidence notes and a recommendation. Draft revisions are retained, stale saves cannot overwrite other changes, and completed interviews can receive an immutable final assessment. Feedback never changes application status or sends candidate notifications. See [Interview scorecards](contracts/SCORECARDS.md) for V11 schema, API contracts and verification.
+
+Employer dashboards link to date-filtered hiring analytics: recorded application funnels, conversion rates, current statuses and average/median time-to-hire. Filters select a UTC submission cohort and optionally one owned job. Missing historical timestamps are disclosed and excluded from duration calculations. See [Hiring analytics](contracts/HIRING_ANALYTICS.md) for metric definitions, privacy boundaries and verification. This feature uses the existing V11 schema.

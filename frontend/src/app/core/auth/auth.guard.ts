@@ -3,6 +3,9 @@ import { CanActivateFn, Router } from '@angular/router';
 import { UserRole } from '../../domain/user.model';
 import { AuthStore } from './auth.store';
 
+export const authenticatedGuard: CanActivateFn = () => inject(AuthStore).isAuthenticated()
+  ? true : inject(Router).createUrlTree(['/auth/login']);
+
 export const roleGuard = (role: UserRole): CanActivateFn =>
   () => {
     const auth = inject(AuthStore);

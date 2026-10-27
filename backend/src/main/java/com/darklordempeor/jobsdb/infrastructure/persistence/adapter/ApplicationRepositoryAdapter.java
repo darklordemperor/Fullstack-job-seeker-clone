@@ -18,7 +18,7 @@ public class ApplicationRepositoryAdapter implements ApplicationRepository {
 
 	@Override
 	public JobApplication save(JobApplication application) {
-		return toDomain(applications.save(toEntity(application)));
+		return toDomain(applications.saveAndFlush(toEntity(application)));
 	}
 
 	@Override

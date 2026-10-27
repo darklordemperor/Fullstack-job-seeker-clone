@@ -20,6 +20,9 @@ public class SecurityConfig {
 		return http
 				.csrf(AbstractHttpConfigurer::disable)
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(errors -> errors
+                    .authenticationEntryPoint((request, response, ex) -> writeError(response, 401, "Authentication required"))
+                    .accessDeniedHandler((request, response, ex) -> writeError(response, 403, "Access denied")))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/api/auth/**", "/swagger-ui.html", "/swagger-ui/**", "/api-docs/**", "/uploads/**", "/error").permitAll()
 						.requestMatchers(HttpMethod.GET, "/api/jobs", "/api/jobs/**").permitAll()
@@ -38,4 +41,11 @@ public class SecurityConfig {
 	PasswordEncoder passwordEncoder() {
 		return new BCryptPasswordEncoder();
 	}
+
+    private void writeError(jakarta.servlet.http.HttpServletResponse response, int status, String message) throws java.io.IOException {
+        response.setStatus(status);
+        response.setContentType("application/json");
+        response.getWriter().write("{\"success\":false,\"data\":null,\"message\":\"" + message
+                + "\",\"timestamp\":\"" + java.time.Instant.now() + "\"}");
+    }
 }

@@ -16,7 +16,7 @@ import com.darklordempeor.jobsdb.domain.model.UserRole;
 import com.darklordempeor.jobsdb.domain.repository.ApplicationRepository;
 import com.darklordempeor.jobsdb.domain.repository.JobRepository;
 import com.darklordempeor.jobsdb.domain.repository.UserRepository;
-import com.darklordempeor.jobsdb.interfaces.dto.response.AdminStatsResponse;
+import com.darklordempeor.jobsdb.application.model.AdminStats;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -32,11 +32,13 @@ class AdminUseCaseTest {
 	@Mock private UserRepository users;
 	@Mock private JobRepository jobs;
 	@Mock private ApplicationRepository applications;
+    @Mock private com.darklordempeor.jobsdb.application.port.AdminQueryPort hiring;
+	@Mock private com.darklordempeor.jobsdb.application.port.AuditPort audit;
 	private AdminUseCase useCase;
 
 	@BeforeEach
 	void setUp() {
-		useCase = new AdminUseCase(users, jobs, applications);
+		useCase = new AdminUseCase(users, jobs, applications, hiring, audit);
 	}
 
 	@Test
@@ -50,7 +52,7 @@ class AdminUseCaseTest {
 		when(users.countCreatedSince(any())).thenReturn(2L);
 		when(jobs.countCreatedSince(any())).thenReturn(4L);
 
-		assertThat(useCase.stats()).isEqualTo(new AdminStatsResponse(10, 6, 3, 8, 5, 7, 2, 4));
+		assertThat(useCase.stats()).isEqualTo(new AdminStats(10, 6, 3, 8, 5, 7, 2, 4));
 	}
 
 	@Test
@@ -98,7 +100,7 @@ class AdminUseCaseTest {
 	@Test
 	void deleteApplicationDelegatesToRepository() {
 		UUID applicationId = UUID.randomUUID();
-		useCase.deleteApplication(applicationId, "reason");
+		useCase.deleteApplication(UUID.randomUUID(), applicationId, "reason");
 		verify(applications).deleteById(applicationId);
 	}
 
@@ -125,4 +127,25 @@ class AdminUseCaseTest {
 	private Job job(JobStatus status) {
 		return new Job(UUID.randomUUID(), UUID.randomUUID(), "Title", "Description", "Bangkok", 1, 2, "THB", status, Instant.now());
 	}
+@Test void legacyListsAndPagedQueriesKeepTheirContracts() {
+        var expectedUsers = java.util.List.of(user(false));
+        when(users.findAll()).thenReturn(expectedUsers);
+        when(applications.findAll()).thenReturn(java.util.List.of());
+        assertThat(useCase.allUsers()).isSameAs(expectedUsers);
+        assertThat(useCase.allApplications()).isEmpty();
+        useCase.users(-1, 999); useCase.users(2, 0);
+        useCase.applications(-1, 999); useCase.applications(2, 0);
+        verify(hiring).users(0, 50); verify(hiring).users(2, 1);
+        verify(hiring).allApplications(0, 50); verify(hiring).allApplications(2, 1);
+    }
+    @Test void moderationRecordsActorTargetAndReasonAndStopsOnAuditFailure() {
+        UUID actor = UUID.randomUUID(); User target = user(false);
+        when(users.findById(target.id())).thenReturn(Optional.of(target));
+        useCase.banUser(actor, target.id(), "Verified abuse");
+        verify(audit).audit(actor, "BAN_USER", "USER", target.id(), "Verified abuse");
+        UUID application = UUID.randomUUID();
+        org.mockito.Mockito.doThrow(new IllegalStateException("Audit unavailable")).when(audit).audit(actor, "DELETE_APPLICATION", "APPLICATION", application, "reason");
+        assertThatThrownBy(() -> useCase.deleteApplication(actor, application, "reason")).hasMessage("Audit unavailable");
+        verify(applications, never()).deleteById(application);
+    }
 }

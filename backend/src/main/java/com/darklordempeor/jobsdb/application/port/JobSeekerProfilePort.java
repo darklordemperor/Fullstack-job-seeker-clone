@@ -1,11 +1,11 @@
 package com.darklordempeor.jobsdb.application.port;
 
-import com.darklordempeor.jobsdb.interfaces.dto.request.JobSeekerProfileRequest;
-import java.util.Map;
+import com.darklordempeor.jobsdb.application.model.JobSeekerProfileCommand;
+import com.darklordempeor.jobsdb.application.model.HiringModels.Profile;
 import java.util.UUID;
 
 public interface JobSeekerProfilePort {
-	Map<String, Object> findOrCreate(UUID userId);
-	Map<String, Object> update(UUID userId, JobSeekerProfileRequest request);
-	Map<String, Object> updateImage(UUID userId, String profileImageUrl);
+	Profile findOrCreate(UUID userId);
+	Profile update(UUID userId, JobSeekerProfileCommand request);
+	Profile updateImage(UUID userId, String profileImageUrl);
 }

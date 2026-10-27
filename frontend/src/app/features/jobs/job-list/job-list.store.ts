@@ -3,7 +3,7 @@ import { tapResponse } from '@ngrx/operators';
 import { patchState, signalStore, withComputed, withMethods, withState } from '@ngrx/signals';
 import { rxMethod } from '@ngrx/signals/rxjs-interop';
 import { pipe, switchMap, tap } from 'rxjs';
-import { JobRepository } from '../../../data/job.repository';
+import { JOB_REPOSITORY } from '../../../core/di/repository.tokens';
 import { Job, JobFilter } from '../../../domain/job.model';
 
 interface JobListState {
@@ -33,7 +33,7 @@ export const JobListStore = signalStore(
   withComputed(({ jobs }) => ({
     hasJobs: computed(() => jobs().length > 0),
   })),
-  withMethods((store, repo = inject(JobRepository)) => {
+  withMethods((store, repo = inject(JOB_REPOSITORY)) => {
     const loadData = rxMethod<JobFilter>(
       pipe(
         tap((filters) => patchState(store, { loading: true, error: null, filters })),
@@ -48,7 +48,7 @@ export const JobListStore = signalStore(
                 totalPages: data.totalPages,
                 loading: false,
               }),
-              error: (err: Error) => patchState(store, { error: err.message, loading: false }),
+              error: (err: Error) => patchState(store, { error: err.message, loading: false, jobs: [], selected: null, totalElements: 0, totalPages: 1 }),
             }),
           ),
         ),

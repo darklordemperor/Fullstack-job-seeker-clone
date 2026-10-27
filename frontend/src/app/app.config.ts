@@ -1,3 +1,4 @@
+import { provideRepositories } from './core/di/repository.providers';
 import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
@@ -8,8 +9,9 @@ import { jwtInterceptor } from './core/http/jwt.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
+    provideRepositories(),
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
-    provideHttpClient(withInterceptors([jwtInterceptor, errorInterceptor])),
+    provideHttpClient(withInterceptors([errorInterceptor, jwtInterceptor])),
   ]
 };
