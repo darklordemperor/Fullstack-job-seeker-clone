@@ -65,4 +65,3 @@ export const ScorecardStore = signalStore(
     };
   }), withHooks({ onDestroy(store) { store.dispose(); } }),
 );
-

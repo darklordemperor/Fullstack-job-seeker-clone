@@ -105,5 +105,3 @@ export class ScorecardComponent implements OnInit {
     else { this.confirmation.set(null); await this.store.save(true); }
   }
 }
-
-

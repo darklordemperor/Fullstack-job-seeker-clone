@@ -48,4 +48,3 @@ for (const [width, height] of [[320, 568], [768, 1024], [844, 390], [1440, 900]]
     await page.reload(); await expect(page.getByText('Existing feedback is read-only.', { exact: false })).toBeVisible(); await expect(strengths).toBeDisabled();
   });
 }
-
