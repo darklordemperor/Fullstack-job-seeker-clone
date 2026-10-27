@@ -1,0 +1,7 @@
+target
+build
+uploads
+*.log
+.env
+.env.*
+.git

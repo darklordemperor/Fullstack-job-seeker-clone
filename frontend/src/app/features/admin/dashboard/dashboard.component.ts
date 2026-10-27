@@ -1,7 +1,8 @@
-import { Component, inject } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, inject, OnInit, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
+import { AdminStats } from '../../../domain/admin.model';
 import { RouterLink } from '@angular/router';
-import { AdminRepository } from '../../../data/admin.repository';
+import { ADMIN_REPOSITORY } from '../../../core/di/repository.tokens';
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -16,6 +17,8 @@ import { AdminRepository } from '../../../data/admin.repository';
         </div>
         <a routerLink="/jobs" class="rounded-md border border-slate-300 px-5 py-3 text-sm font-bold">Browse jobs</a>
       </div>
+      @if (loading()) { <p class="mt-6" role="status">Loading statistics…</p> }
+      @if (error()) { <p class="mt-6 text-red-700" role="alert">Unable to load statistics. <button (click)="load()" class="underline">Retry</button></p> }
       @if (stats(); as stats) {
         <section class="mt-7 grid gap-4 md:grid-cols-4">
           @for (metric of [
@@ -76,9 +79,18 @@ import { AdminRepository } from '../../../data/admin.repository';
     </main>
   `,
 })
-export class AdminDashboardComponent {
-  private readonly repository = inject(AdminRepository);
-  protected readonly stats = toSignal(this.repository.stats());
+export class AdminDashboardComponent implements OnInit {
+  private readonly repository = inject(ADMIN_REPOSITORY);
+  protected readonly stats = signal<AdminStats | null>(null);
+  protected readonly error = signal(false);
+  protected readonly loading = signal(false);
+  ngOnInit(): void { void this.load(); }
+  protected async load(): Promise<void> {
+    this.loading.set(true); this.error.set(false);
+    try { this.stats.set(await firstValueFrom(this.repository.stats())); }
+    catch { this.error.set(true); this.stats.set(null); }
+    finally { this.loading.set(false); }
+  }
 
   protected percentage(value: number, total: number): number {
     return total <= 0 ? 0 : Math.max(4, Math.round(value / total * 100));

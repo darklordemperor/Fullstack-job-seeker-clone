@@ -1,0 +1,12 @@
+node_modules
+.angular
+dist
+out-tsc
+coverage
+playwright-report
+test-results
+tmp
+*.log
+.env
+.env.*
+.git

@@ -1,21 +1,15 @@
+import { AuthRepositoryPort } from '../domain/repositories/auth.repository.port';
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { map, Observable, of } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { ApiResponse } from '../domain/api-response.model';
+import { ApiResponse } from './dto/api-response';
 import { AuthTokens, UserRole } from '../domain/user.model';
 
-export interface LoginPayload {
-  email: string;
-  password: string;
-}
-
-export interface RegisterPayload extends LoginPayload {
-  displayName: string;
-}
+import { LoginPayload, RegisterPayload } from '../domain/auth.model';
 
 @Injectable({ providedIn: 'root' })
-export class AuthRepository {
+export class AuthRepository implements AuthRepositoryPort {
   private readonly http = inject(HttpClient);
   private readonly apiUrl = environment.apiUrl;
 
@@ -37,5 +31,9 @@ export class AuthRepository {
       refreshToken: `demo-refresh-${role}`,
       tokenType: 'Bearer',
     });
+  }
+
+  logout(refreshToken: string): Observable<void> {
+    return this.http.post<ApiResponse<void>>(`${this.apiUrl}/auth/logout`, { refreshToken }).pipe(map(() => undefined));
   }
 }

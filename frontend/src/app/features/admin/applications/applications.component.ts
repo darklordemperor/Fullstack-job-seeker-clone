@@ -1,7 +1,7 @@
-import { Component, computed, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, inject, OnInit, signal } from '@angular/core';
+
 import { firstValueFrom } from 'rxjs';
-import { AdminRepository } from '../../../data/admin.repository';
+import { ADMIN_REPOSITORY } from '../../../core/di/repository.tokens';
 import { JobApplication } from '../../../domain/application.model';
 import { PaginationComponent } from '../../../shared/ui/pagination/pagination.component';
 import { ToastService } from '../../../shared/ui/toast/toast.service';
@@ -15,10 +15,13 @@ import { DeleteApplicationDialogComponent } from './delete-application-dialog.co
     <main class="shell py-8">
       <div>
         <h1 class="text-2xl font-bold">Application moderation</h1>
-        <p class="mt-2 text-sm text-slate-600">Review 20 seeded application records, eight at a time.</p>
+        <p class="mt-2 text-sm text-slate-600">Review submitted applications and record moderation reasons.</p>
       </div>
+      @if (loading()) { <p class="mt-6" role="status">Loading applications…</p> }
+      @if (error()) { <p class="mt-6 text-red-700" role="alert">{{ error() }} <button (click)="load()" class="underline">Retry</button></p> }
+      @if (!loading() && !error() && applications().length === 0) { <p class="mt-6">No applications on this page.</p> }
       <section class="mt-6 card-surface divide-y divide-slate-100">
-        @for (application of pagedApplications(); track application.id) {
+        @for (application of applications(); track application.id) {
           <article class="flex flex-wrap items-center justify-between gap-4 p-5">
             <div>
               <p class="font-semibold">{{ application.jobTitle }}</p>
@@ -30,31 +33,43 @@ import { DeleteApplicationDialogComponent } from './delete-application-dialog.co
         }
       </section>
       <div class="mt-5">
-        <app-pagination [page]="page()" [totalPages]="totalPages()" (pageChange)="page.set($event)" />
+        <app-pagination [page]="page()" [totalPages]="totalPages()" (pageChange)="load($event)" />
       </div>
       <app-delete-application-dialog [open]="!!selected()" (closed)="selected.set(null)" (confirmed)="remove($event)" />
     </main>
   `,
 })
-export class AdminApplicationsComponent {
-  private readonly repository = inject(AdminRepository);
+export class AdminApplicationsComponent implements OnInit {
+  private readonly repository = inject(ADMIN_REPOSITORY);
   private readonly toast = inject(ToastService);
-  private readonly applications = toSignal(this.repository.applications(), { initialValue: [] });
+  protected readonly applications = signal<JobApplication[]>([]);
   protected readonly page = signal(0);
+  protected readonly totalPages = signal(1);
   protected readonly selected = signal<JobApplication | null>(null);
-  protected readonly removedIds = signal<string[]>([]);
-  protected readonly activeApplications = computed(() => this.applications().filter((item) => !this.removedIds().includes(item.id)));
-  protected readonly totalPages = computed(() => Math.max(1, Math.ceil(this.activeApplications().length / 8)));
-  protected readonly pagedApplications = computed(() => this.activeApplications().slice(this.page() * 8, this.page() * 8 + 8));
+  protected readonly loading = signal(false);
+  protected readonly error = signal('');
+  private loadSequence = 0;
 
+  ngOnInit(): void { void this.load(); }
+  protected async load(page = this.page()): Promise<void> {
+    const sequence = ++this.loadSequence;
+    this.loading.set(true); this.error.set(''); this.applications.set([]);
+    try {
+      const result = await firstValueFrom(this.repository.applicationsPage(page));
+      if (sequence !== this.loadSequence) return;
+      if (result.content.length === 0 && page > 0) { await this.load(page - 1); return; }
+      this.applications.set(result.content); this.page.set(result.page); this.totalPages.set(result.totalPages);
+    } catch { if (sequence === this.loadSequence) this.error.set('Unable to load applications.'); }
+    finally { if (sequence === this.loadSequence) this.loading.set(false); }
+  }
   protected async remove(reason: string): Promise<void> {
     const application = this.selected();
-    if (!application) {
-      return;
-    }
-    await firstValueFrom(this.repository.deleteApplication(application.id, reason));
-    this.removedIds.update((ids) => [...ids, application.id]);
-    this.selected.set(null);
-    this.toast.success('Application deleted with moderation reason');
+    if (!application) return;
+    try {
+      await firstValueFrom(this.repository.deleteApplication(application.id, reason));
+      this.selected.set(null);
+      this.toast.success('Application deleted with moderation reason');
+      await this.load();
+    } catch { this.toast.error('Unable to delete application. Please retry.'); }
   }
 }

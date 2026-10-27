@@ -1,15 +1,18 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
+import { WorkExperienceEditorComponent } from './work-experience-editor.component';
+import { workExperienceError } from '../../../domain/work-experience.rules';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { JobSeekerProfile } from '../../../domain/job-seeker-profile.model';
 import { ProfileStore } from './profile.store';
+import { DialogFocusDirective } from '../../../shared/ui/modal/dialog-focus.directive';
 
-type DrawerSection = 'personal' | 'summary' | 'skills' | 'languages' | 'education' | 'licenses' | null;
+type DrawerSection = 'experience' | 'personal' | 'summary' | 'skills' | 'languages' | 'education' | 'licenses' | null;
 
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, DialogFocusDirective, WorkExperienceEditorComponent],
   providers: [ProfileStore],
   template: `
     <main class="shell max-w-5xl pb-12">
@@ -43,6 +46,7 @@ type DrawerSection = 'personal' | 'summary' | 'skills' | 'languages' | 'educatio
                 @if (profile.resumeUrl) {
                   <a [href]="profile.resumeUrl" class="mt-1 block text-xs font-semibold text-[#174ea6]">View attached resume</a>
                 }
+                <a routerLink="/job-seeker/resumes" class="mt-3 inline-block rounded-lg border border-blue-200 px-4 py-3 text-sm font-semibold text-blue-800">Manage résumé PDFs →</a>
               </div>
             </div>
 
@@ -57,16 +61,18 @@ type DrawerSection = 'personal' | 'summary' | 'skills' | 'languages' | 'educatio
             </section>
 
             <section class="mt-8">
-              <h2 class="text-xl font-bold">Work experience</h2>
+              <div class="flex items-center justify-between gap-3"><h2 class="text-xl font-bold">Work experience</h2>
+                <button type="button" aria-label="Edit work experience" class="min-h-11 text-sm font-bold text-[#174ea6]" (click)="open('experience')">Add or edit</button></div>
               <div class="mt-3 grid gap-3">
-                @for (item of profile.workExperiences; track item.company + item.title) {
-                  <article class="card-surface p-5">
+                @for (item of profile.workExperiences; track $index) {
+                  <article class="card-surface break-words p-5">
                     <h3 class="font-bold">{{ item.title }}</h3>
                     <p class="mt-1 text-sm text-slate-700">{{ item.company }}</p>
-                    <p class="mt-3 text-sm leading-6 text-slate-600">{{ item.description }}</p>
+                    <p class="mt-2 text-xs text-slate-500">{{ item.startDate || 'Start date unspecified' }} – {{ item.endDate || 'Ongoing / end date unspecified' }}</p>
+                    <p class="mt-3 whitespace-pre-line break-words text-sm leading-6 text-slate-600">{{ item.description }}</p>
                   </article>
                 } @empty {
-                  <article class="card-surface p-5 text-sm text-slate-500">Add work history through the API profile payload.</article>
+                  <article class="card-surface p-5 text-sm text-slate-500">No work experience added yet.</article>
                 }
               </div>
             </section>
@@ -137,40 +143,50 @@ type DrawerSection = 'personal' | 'summary' | 'skills' | 'languages' | 'educatio
 
           <aside class="mt-16 grid content-start gap-5">
             <section class="border-b border-slate-200 pb-5">
-              <p class="text-sm font-bold">Profile visibility</p>
-              <p class="mt-2 text-xs text-slate-500">Searchable by employers</p>
+              <p class="text-sm font-bold">Profile preferences</p>
+              <a routerLink="/job-seeker/settings" class="mt-2 block text-xs text-blue-700">Manage discovery preferences</a>
             </section>
             <section class="card-surface p-5">
               <h2 class="font-bold">Profile completeness</h2>
               <div class="mt-4 h-2 rounded bg-slate-100"><div class="h-2 rounded bg-emerald-600" [style.width.%]="store.completeness()"></div></div>
               <p class="mt-3 text-sm text-slate-600">{{ store.completeness() }}% complete</p>
             </section>
+            <a routerLink="/job-seeker/saved-jobs" class="card-surface p-4 text-sm font-bold text-[#174ea6]">View saved jobs →</a>
             <a routerLink="/job-seeker/my-applications" class="card-surface p-4 text-sm font-bold text-[#174ea6]">Track my applications →</a>
           </aside>
         </section>
       } @else if (store.loading()) {
         <section class="p-12 text-center text-sm text-slate-500">Loading your profile...</section>
+      } @else if (store.error()) {
+        <section role="alert" class="p-8 text-center text-red-800">
+          <h1 class="text-xl font-bold">Unable to load your profile</h1>
+          <button type="button" class="mt-4 rounded border border-red-300 px-5 py-3 font-semibold" (click)="store.loadData()">Retry</button>
+        </section>
       } @else {
         <section class="p-12 text-center">
-          <h1 class="text-xl font-bold">Sign in with a real job seeker account</h1>
-          <p class="mt-2 text-sm text-slate-500">Profile editing uses your authenticated Spring Boot API and PostgreSQL record.</p>
+          <h1 class="text-xl font-bold">Your profile is not available</h1>
+          <p class="mt-2 text-sm text-slate-500">Please try loading your profile again.</p>
         </section>
       }
     </main>
 
     @if (drawer(); as activeDrawer) {
       <div class="fixed inset-0 z-50 bg-slate-950/45" (click)="close()"></div>
-      <aside class="fixed right-0 top-0 z-50 h-full w-full max-w-md overflow-y-auto bg-white p-6 shadow-2xl">
+      <aside appDialogFocus aria-label="Profile editor" (dismissed)="close()" class="fixed right-0 top-0 z-50 h-full w-full max-w-md overflow-y-auto bg-white p-6 shadow-2xl [&_input]:min-w-0 [&_textarea]:min-w-0">
         <div class="flex items-start justify-between gap-4">
           <div>
             <p class="text-xs font-bold uppercase tracking-wide text-[#174ea6]">Profile editor</p>
             <h2 class="mt-1 text-xl font-bold">{{ drawerTitle(activeDrawer) }}</h2>
           </div>
-          <button type="button" class="text-xl text-slate-500" (click)="close()">×</button>
+          <button type="button" aria-label="Close profile editor" class="min-h-11 min-w-11 text-xl text-slate-500" (click)="close()">×</button>
         </div>
 
         @if (draft(); as form) {
+          <fieldset class="min-w-0" [disabled]="store.loading()">
           @switch (activeDrawer) {
+            @case ('experience') {
+              <app-work-experience-editor [experiences]="form.workExperiences" (experiencesChange)="patchDraft({ workExperiences: $event })" />
+            }
             @case ('personal') {
               <div class="mt-6 grid gap-4">
                 <label class="grid gap-1 text-sm font-semibold">Full name<input class="rounded border px-3 py-2 font-normal" [ngModel]="form.fullName" (ngModelChange)="patchDraft({ fullName: $event })"></label>
@@ -194,7 +210,7 @@ type DrawerSection = 'personal' | 'summary' | 'skills' | 'languages' | 'educatio
               </div>
             }
             @case ('languages') {
-              <div class="mt-6 grid grid-cols-[1fr_1fr_auto] gap-2">
+              <div class="mt-6 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
                 <input class="rounded border px-3 py-2 text-sm" placeholder="Language" [ngModel]="newLanguage()" (ngModelChange)="newLanguage.set($event)">
                 <input class="rounded border px-3 py-2 text-sm" placeholder="Proficiency" [ngModel]="newProficiency()" (ngModelChange)="newProficiency.set($event)">
                 <button type="button" class="rounded bg-[#174ea6] px-3 text-sm font-bold text-white" (click)="addLanguage()">Add</button>
@@ -233,8 +249,10 @@ type DrawerSection = 'personal' | 'summary' | 'skills' | 'languages' | 'educatio
               </div>
             }
           }
+          </fieldset>
+          @if (formError() || store.error()) { <p role="alert" class="mt-4 rounded bg-red-50 p-3 text-sm text-red-800">{{ formError() || store.error() }}</p> }
           <div class="mt-8 flex gap-3 border-t pt-5">
-            <button type="button" class="rounded bg-[#174ea6] px-5 py-2 text-sm font-bold text-white" (click)="save()">Save</button>
+            <button type="button" class="rounded bg-[#174ea6] px-5 py-2 text-sm font-bold text-white" [disabled]="store.loading()" (click)="save()">{{ store.loading() ? 'Saving…' : 'Save' }}</button>
             <button type="button" class="rounded px-4 py-2 text-sm font-bold text-[#174ea6]" (click)="close()">Cancel</button>
           </div>
         }
@@ -244,6 +262,7 @@ type DrawerSection = 'personal' | 'summary' | 'skills' | 'languages' | 'educatio
 })
 export class ProfileComponent implements OnInit {
   protected readonly store = inject(ProfileStore);
+  protected readonly formError = signal<string | null>(null);
   protected readonly drawer = signal<DrawerSection>(null);
   protected readonly draft = signal<JobSeekerProfile | null>(null);
   protected readonly avatarMenu = signal(false);
@@ -264,25 +283,27 @@ export class ProfileComponent implements OnInit {
 
   protected open(section: Exclude<DrawerSection, null>): void {
     const profile = this.store.profile();
-    if (!profile) {
+    if (!profile || this.store.loading()) {
       return;
     }
+    this.formError.set(null);
     this.draft.set(structuredClone(profile));
     this.drawer.set(section);
   }
 
   protected close(): void {
+    if (this.store.loading()) return;
     this.drawer.set(null);
     this.draft.set(null);
   }
 
-  protected save(): void {
+  protected async save(): Promise<void> {
     const profile = this.draft();
-    if (!profile) {
-      return;
-    }
-    this.store.save(profile);
-    this.close();
+    if (!profile || this.store.loading()) return;
+    const error = workExperienceError(profile.workExperiences);
+    this.formError.set(error);
+    if (error) return;
+    if (await this.store.save(profile)) this.close();
   }
 
   protected patchDraft(change: Partial<JobSeekerProfile>): void {
@@ -378,6 +399,7 @@ export class ProfileComponent implements OnInit {
 
   protected drawerTitle(section: Exclude<DrawerSection, null>): string {
     return {
+      experience: 'Edit work experience',
       personal: 'Edit personal details',
       summary: 'Edit profile summary',
       skills: 'Edit skills',

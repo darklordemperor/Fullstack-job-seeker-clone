@@ -7,9 +7,9 @@ import static org.mockito.Mockito.when;
 
 import com.darklordempeor.jobsdb.application.port.JobSeekerProfilePort;
 import com.darklordempeor.jobsdb.application.port.ProfileImagePort;
-import com.darklordempeor.jobsdb.interfaces.dto.request.JobSeekerProfileRequest;
+import com.darklordempeor.jobsdb.application.model.JobSeekerProfileCommand;
 import java.util.List;
-import java.util.Map;
+import com.darklordempeor.jobsdb.application.model.HiringModels.Profile;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,7 +34,7 @@ class JobSeekerUseCaseTest {
 	@Test
 	void profileDelegatesToPort() {
 		UUID userId = UUID.randomUUID();
-		Map<String, Object> expected = Map.of("userId", userId);
+		Profile expected = org.mockito.Mockito.mock(Profile.class);
 		when(profiles.findOrCreate(userId)).thenReturn(expected);
 
 		assertThat(useCase.profile(userId)).isSameAs(expected);
@@ -44,8 +44,8 @@ class JobSeekerUseCaseTest {
 	@Test
 	void updateProfileDelegatesToPort() {
 		UUID userId = UUID.randomUUID();
-		JobSeekerProfileRequest request = request();
-		Map<String, Object> expected = Map.of("userId", userId);
+		JobSeekerProfileCommand request = request();
+		Profile expected = org.mockito.Mockito.mock(Profile.class);
 		when(profiles.update(userId, request)).thenReturn(expected);
 
 		assertThat(useCase.updateProfile(userId, request)).isSameAs(expected);
@@ -56,7 +56,7 @@ class JobSeekerUseCaseTest {
 	void uploadProfileImageStoresImageThenUpdatesProfile() {
 		UUID userId = UUID.randomUUID();
 		byte[] bytes = { 1, 2, 3 };
-		Map<String, Object> expected = Map.of("profileImageUrl", "/uploads/avatar.png");
+		Profile expected = org.mockito.Mockito.mock(Profile.class);
 		when(profileImages.store(userId, "avatar.jpg", "image/jpeg", bytes)).thenReturn("/uploads/avatar.png");
 		when(profiles.updateImage(userId, "/uploads/avatar.png")).thenReturn(expected);
 
@@ -67,8 +67,8 @@ class JobSeekerUseCaseTest {
 		inOrder.verify(profiles).updateImage(userId, "/uploads/avatar.png");
 	}
 
-	private JobSeekerProfileRequest request() {
-		return new JobSeekerProfileRequest("Name", "0123", null, "Thai", "Bangkok", "Summary", 100, 200, "THB",
+	private JobSeekerProfileCommand request() {
+		return new JobSeekerProfileCommand("Name", "0123", null, "Thai", "Bangkok", "Summary", 100, 200, "THB",
 				List.of(), List.of(), List.of(), List.of(), List.of(), "resume");
 	}
 }

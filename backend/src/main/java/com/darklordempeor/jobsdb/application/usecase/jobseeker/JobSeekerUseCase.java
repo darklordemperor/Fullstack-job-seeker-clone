@@ -2,8 +2,8 @@ package com.darklordempeor.jobsdb.application.usecase.jobseeker;
 
 import com.darklordempeor.jobsdb.application.port.JobSeekerProfilePort;
 import com.darklordempeor.jobsdb.application.port.ProfileImagePort;
-import com.darklordempeor.jobsdb.interfaces.dto.request.JobSeekerProfileRequest;
-import java.util.Map;
+import com.darklordempeor.jobsdb.application.model.JobSeekerProfileCommand;
+import com.darklordempeor.jobsdb.application.model.HiringModels.Profile;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -17,15 +17,15 @@ public class JobSeekerUseCase {
 		this.profileImages = profileImages;
 	}
 
-	public Map<String, Object> profile(UUID userId) {
+	public Profile profile(UUID userId) {
 		return profiles.findOrCreate(userId);
 	}
 
-	public Map<String, Object> updateProfile(UUID userId, JobSeekerProfileRequest request) {
+	public Profile updateProfile(UUID userId, JobSeekerProfileCommand request) {
 		return profiles.update(userId, request);
 	}
 
-	public Map<String, Object> uploadProfileImage(UUID userId, String originalFilename, String contentType, byte[] bytes) {
+	public Profile uploadProfileImage(UUID userId, String originalFilename, String contentType, byte[] bytes) {
 		return profiles.updateImage(userId, profileImages.store(userId, originalFilename, contentType, bytes));
 	}
 }

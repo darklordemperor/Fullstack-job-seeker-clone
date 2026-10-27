@@ -1,36 +1,46 @@
+import { AdminRepositoryPort } from '../domain/repositories/admin.repository.port';
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { catchError, map, Observable, of } from 'rxjs';
+import { map, Observable, of } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { JobApplication } from '../domain/application.model';
 import { AdminStats } from '../domain/admin.model';
-import { ApiResponse } from '../domain/api-response.model';
+import { ApiResponse } from './dto/api-response';
+import { PagedResponse } from '../domain/page.model';
 import { User } from '../domain/user.model';
 import { sampleApplications, sampleStats, sampleUsers } from './sample-data';
 
 @Injectable({ providedIn: 'root' })
-export class AdminRepository {
+export class AdminRepository implements AdminRepositoryPort {
   private readonly http = inject(HttpClient);
   private readonly apiUrl = environment.apiUrl;
 
+  usersPage(page: number): Observable<PagedResponse<User>> {
+    return this.http.get<ApiResponse<PagedResponse<User>>>(`${this.apiUrl}/admin/users/page`, { params: { page, size: 8 } }).pipe(map(response => response.data));
+  }
+
+  applicationsPage(page: number): Observable<PagedResponse<JobApplication>> {
+    return this.http.get<ApiResponse<PagedResponse<JobApplication>>>(`${this.apiUrl}/admin/applications/page`, { params: { page, size: 8 } }).pipe(map(response => response.data));
+  }
+
   stats(): Observable<AdminStats> {
+    if (environment.demoMode) return of(sampleStats);
     return this.http.get<ApiResponse<AdminStats>>(`${this.apiUrl}/admin/stats`).pipe(
       map((response) => response.data),
-      catchError(() => of(sampleStats)),
     );
   }
 
   users(): Observable<User[]> {
+    if (environment.demoMode) return of(sampleUsers);
     return this.http.get<ApiResponse<User[]>>(`${this.apiUrl}/admin/users`).pipe(
       map((response) => response.data),
-      catchError(() => of(sampleUsers)),
     );
   }
 
   applications(): Observable<JobApplication[]> {
+    if (environment.demoMode) return of(sampleApplications);
     return this.http.get<ApiResponse<JobApplication[]>>(`${this.apiUrl}/admin/applications`).pipe(
-      map((response) => response.data.length > 0 ? response.data : sampleApplications),
-      catchError(() => of(sampleApplications)),
+      map((response) => response.data),
     );
   }
 
@@ -49,7 +59,6 @@ export class AdminRepository {
   deleteApplication(id: string, reason: string): Observable<void> {
     return this.http.delete<ApiResponse<void>>(`${this.apiUrl}/admin/applications/${id}`, { body: { reason } }).pipe(
       map(() => undefined),
-      catchError(() => of(undefined)),
     );
   }
 }

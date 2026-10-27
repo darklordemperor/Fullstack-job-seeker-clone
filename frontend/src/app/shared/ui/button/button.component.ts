@@ -5,7 +5,7 @@ import { Component, input, output } from '@angular/core';
   standalone: true,
   template: `
     <button
-      type="button"
+      [type]="type()"
       class="inline-flex h-11 items-center justify-center rounded-md px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
       [class.bg-pink-600]="variant() === 'primary'"
       [class.text-white]="variant() === 'primary'"
@@ -22,6 +22,7 @@ import { Component, input, output } from '@angular/core';
   `,
 })
 export class ButtonComponent {
+  readonly type = input<'button' | 'submit'>('button');
   readonly variant = input<'primary' | 'secondary' | 'outline'>('primary');
   readonly disabled = input(false);
   readonly pressed = output<void>();

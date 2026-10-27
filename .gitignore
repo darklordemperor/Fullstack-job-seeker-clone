@@ -10,10 +10,14 @@ frontend/tmp/
 frontend/out-tsc/
 frontend/.angular/cache/
 frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+frontend/e2e/.auth/
 
 # Backend
 backend/target/
 backend/build/
+backend/uploads/
 backend/.mvn/wrapper/maven-wrapper.jar
 
 # Editors

@@ -1,7 +1,8 @@
 import { Routes } from '@angular/router';
-import { roleGuard } from './core/auth/auth.guard';
+import { roleGuard, authenticatedGuard } from './core/auth/auth.guard';
 
 export const routes: Routes = [
+  { path: 'notifications', canActivate: [authenticatedGuard], loadComponent: () => import('./features/notifications/notifications.component').then(m => m.NotificationsComponent) },
   {
     path: '',
     loadComponent: () => import('./features/home/home.component').then((m) => m.HomeComponent),

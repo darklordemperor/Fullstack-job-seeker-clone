@@ -21,4 +21,4 @@ services:
       - /app/node_modules
     ports: !override
       - "${FRONTEND_PORT:-4200}:4200"
-    command: npx ng serve --host 0.0.0.0 --poll 2000
+    command: npx ng serve --host 0.0.0.0 --poll 2000 --proxy-config proxy.docker.conf.json

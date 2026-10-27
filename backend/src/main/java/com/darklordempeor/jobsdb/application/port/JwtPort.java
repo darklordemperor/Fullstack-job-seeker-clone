@@ -5,4 +5,6 @@ import com.darklordempeor.jobsdb.domain.model.User;
 public interface JwtPort {
 	String createAccessToken(User user);
 	String createRefreshToken(User user);
+	java.util.UUID consumeRefreshToken(String token);
+	void revokeRefreshToken(String token);
 }
